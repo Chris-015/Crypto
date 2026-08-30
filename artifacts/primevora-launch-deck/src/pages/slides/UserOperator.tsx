@@ -1,0 +1,19 @@
+export default function UserOperator() {
+  return (
+    <div className="relative h-screen w-screen overflow-hidden bg-[#0c0f1a] font-body text-white">
+      <div className="pointer-events-none absolute inset-0 opacity-45" style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px)', backgroundSize: '4vw 4vw' }} />
+      <div className="absolute left-[20vw] top-[8vh] h-[38vw] w-[38vw] rounded-full bg-[#7c6bf0]/[.06] blur-[12vw]" />
+      <div className="absolute left-[5vw] top-[5vh] flex items-center gap-[1vw]"><div className="h-[2vw] w-[2vw] rounded-[.4vw] bg-[#4f7fff]" /><span className="text-[1.2vw] font-bold">primevora<span className="text-[#4f7fff]">.</span></span></div>
+      <div className="absolute right-[5vw] top-[5vh] text-[1vw] text-white/45">05 / 06</div>
+      <div className="relative z-10 mx-auto flex h-full w-[82vw] flex-col justify-center">
+        <div className="mb-[5vh] max-w-[65vw]"><div className="mb-[2vh] w-fit rounded-[2vw] border border-[#7c6bf0]/40 bg-[#7c6bf0]/15 px-[1vw] py-[.55vh] text-[.9vw] font-semibold uppercase tracking-[.1em] text-[#a89cff]">Operating system</div><h2 className="font-display text-[4vw] font-extrabold leading-[1.08] tracking-[-.05em]">Built for users and operators</h2></div>
+        <div className="grid grid-cols-2 gap-[1.6vw]">
+          <div className="rounded-[1vw] border border-[#4f7fff]/35 bg-[#4f7fff]/10 p-[1.8vw]"><p className="text-[.85vw] font-semibold uppercase tracking-[.12em] text-[#9db5ff]">User workspace</p><div className="mt-[3vh] space-y-[1.5vh] text-[1.05vw] leading-[1.35] text-white/75"><div className="flex gap-[.8vw]"><span className="text-[#4f7fff]">✓</span><span>User workspace for balances, requests, referrals, copy trading, and support</span></div><div className="flex gap-[.8vw]"><span className="text-[#4f7fff]">✓</span><span>Support for secure registration and login through Clerk</span></div></div><div className="mt-[4vh] flex items-center gap-[.8vw] text-[.8vw] text-white/40"><span className="h-[.55vw] w-[.55vw] rounded-full bg-[#34d399]" /> authenticated user surface</div></div>
+          <div className="rounded-[1vw] border border-[#7c6bf0]/35 bg-[#7c6bf0]/10 p-[1.8vw]"><p className="text-[.85vw] font-semibold uppercase tracking-[.12em] text-[#b5acff]">Operations workspace</p><div className="mt-[3vh] space-y-[1.5vh] text-[1.05vw] leading-[1.35] text-white/75"><div className="flex gap-[.8vw]"><span className="text-[#7c6bf0]">✓</span><span>Operations workspace for deposits, withdrawals, KYC, and tickets</span></div><div className="flex gap-[.8vw]"><span className="text-[#7c6bf0]">✓</span><span>Admin replies and ticket closure keep service conversations moving</span></div><div className="flex gap-[.8vw]"><span className="text-[#7c6bf0]">✓</span><span>Deposit-address assignment and withdrawal status review</span></div></div><div className="mt-[3vh] flex items-center gap-[.8vw] text-[.8vw] text-white/40"><span className="h-[.55vw] w-[.55vw] rounded-full bg-[#7c6bf0]" /> operator control surface</div></div>
+        </div>
+        <div className="mt-[4vh] flex items-center justify-between rounded-[.8vw] border border-white/10 bg-white/[.03] px-[1.5vw] py-[1.2vh] text-[.95vw] text-white/62"><span>Deposits</span><span className="text-white/25">→</span><span>Withdrawals</span><span className="text-white/25">→</span><span>KYC</span><span className="text-white/25">→</span><span>Support</span><span className="ml-auto text-[#8eacff]">status remains visible</span></div>
+      </div>
+      <div className="absolute bottom-[5vh] left-[5vw] text-[.9vw] tracking-[.05em] text-white/35">PRIMEVORA / OPERATING SYSTEM</div>
+    </div>
+  );
+}

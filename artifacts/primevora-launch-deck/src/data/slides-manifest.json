@@ -1,0 +1,50 @@
+[
+  {
+    "id": "7c2e1de8-8515-4e12-b0a7-0fc99dc4e6c1",
+    "position": 1,
+    "filepath": "src/pages/slides/PrimevoraCover.tsx",
+    "title": "Primevora",
+    "description": "A steadier way to hold value.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "bfa7a948-58f4-4c15-8b4b-e6e44c8e17f0",
+    "position": 2,
+    "filepath": "src/pages/slides/CalmOperations.tsx",
+    "title": "Make digital asset operations feel calm",
+    "description": "The product thesis behind Primevora.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "d1f3f6ad-4401-4425-a1a4-2e0ac136f2d3",
+    "position": 3,
+    "filepath": "src/pages/slides/PlatformMoments.tsx",
+    "title": "One platform. The moments that matter.",
+    "description": "The product surface across balances, transfers, rewards, and simulated copy trading.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "2f41e3d0-6bb9-47d1-9c3d-961002fbcf47",
+    "position": 4,
+    "filepath": "src/pages/slides/TrustFlow.tsx",
+    "title": "Trust is built into the flow",
+    "description": "KYC and withdrawal safeguards are visible before funds move.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "e8ef31d4-f160-47cd-8c53-2de8e10ca531",
+    "position": 5,
+    "filepath": "src/pages/slides/UserOperator.tsx",
+    "title": "Built for users and operators",
+    "description": "A connected user workspace and operations workspace.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "4d39fdbc-6c9d-4bf2-9545-7c77f4dd2d19",
+    "position": 6,
+    "filepath": "src/pages/slides/TransparentFoundation.tsx",
+    "title": "A transparent foundation for what comes next",
+    "description": "The current build and the next production priorities.",
+    "speakerNotes": ""
+  }
+]

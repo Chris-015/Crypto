@@ -1,0 +1,28 @@
+kind = "slides"
+previewPath = "/primevora-launch-deck/"
+title = "Primevora Project Deck"
+description = "A six-slide product launch deck presenting Primevora, a premium USDT-focused digital asset platform with KYC, transparent withdrawals, referrals, copy trading, support, and operations workflows."
+version = "1.0.0"
+id = "artifacts/primevora-launch-deck"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/primevora-launch-deck/" ]
+localPort = 19406
+
+[services.development]
+run = "pnpm --filter @workspace/primevora-launch-deck run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/primevora-launch-deck", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/primevora-launch-deck/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19406"
+BASE_PATH = "/primevora-launch-deck/"
