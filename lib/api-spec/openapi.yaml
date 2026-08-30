@@ -10,6 +10,14 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: portfolio
+    description: Authenticated portfolio operations
+  - name: market
+    description: Public market data
+  - name: support
+    description: Customer support
+  - name: admin
+    description: Admin operations
 paths:
   /healthz:
     get:
@@ -24,6 +32,411 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /market:
+    get:
+      operationId: getMarket
+      tags: [market]
+      summary: Get live cryptocurrency market data
+      responses:
+        "200":
+          description: Market data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MarketAsset"
+  /dashboard:
+    get:
+      operationId: getDashboard
+      tags: [portfolio]
+      summary: Get portfolio dashboard
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Dashboard"
+  /transactions:
+    get:
+      operationId: getTransactions
+      tags: [portfolio]
+      summary: List account transactions
+      responses:
+        "200":
+          description: Transactions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Transaction"
+  /deposits:
+    get:
+      operationId: getDeposits
+      tags: [portfolio]
+      summary: List deposit requests
+      responses:
+        "200":
+          description: Deposit requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DepositRequest"
+    post:
+      operationId: createDeposit
+      tags: [portfolio]
+      summary: Create a deposit request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DepositInput"
+      responses:
+        "201":
+          description: Deposit request created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DepositRequest"
+  /withdrawals:
+    get:
+      operationId: getWithdrawals
+      tags: [portfolio]
+      summary: List withdrawal requests
+      responses:
+        "200":
+          description: Withdrawal requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WithdrawalRequest"
+    post:
+      operationId: createWithdrawal
+      tags: [portfolio]
+      summary: Create a withdrawal request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WithdrawalInput"
+      responses:
+        "201":
+          description: Withdrawal request created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WithdrawalRequest"
+  /referrals:
+    get:
+      operationId: getReferrals
+      tags: [portfolio]
+      summary: Get referral performance
+      responses:
+        "200":
+          description: Referral summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReferralSummary"
+  /support/faqs:
+    get:
+      operationId: getFaqs
+      tags: [support]
+      summary: List frequently asked questions
+      responses:
+        "200":
+          description: FAQs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Faq"
+  /support/tickets:
+    get:
+      operationId: getTickets
+      tags: [support]
+      summary: List support tickets
+      responses:
+        "200":
+          description: Support tickets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SupportTicket"
+    post:
+      operationId: createTicket
+      tags: [support]
+      summary: Create a support ticket
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TicketInput"
+      responses:
+        "201":
+          description: Support ticket created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupportTicket"
+  /support/tickets/{id}/reply:
+    post:
+      operationId: createTicketReply
+      tags: [support]
+      summary: Add a reply to a support ticket
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TicketReplyInput"
+      responses:
+        "201":
+          description: Updated support ticket
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupportTicket"
+  /admin/overview:
+    get:
+      operationId: getAdminOverview
+      tags: [admin]
+      summary: Get admin dashboard summary
+      responses:
+        "200":
+          description: Admin summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminOverview"
+  /admin/deposits:
+    get:
+      operationId: getAdminDeposits
+      tags: [admin]
+      summary: List all deposit requests
+      responses:
+        "200":
+          description: Deposit requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DepositRequest"
+  /admin/deposits/{id}/address:
+    post:
+      operationId: assignDepositAddress
+      tags: [admin]
+      summary: Assign a manually verified TRC20 deposit address
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DepositAddressInput"
+      responses:
+        "200":
+          description: Updated deposit request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DepositRequest"
+  /admin/withdrawals:
+    get:
+      operationId: getAdminWithdrawals
+      tags: [admin]
+      summary: List all withdrawal requests
+      responses:
+        "200":
+          description: Withdrawal requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WithdrawalRequest"
+  /admin/withdrawals/{id}/status:
+    post:
+      operationId: updateWithdrawalStatus
+      tags: [admin]
+      summary: Update a withdrawal request status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StatusUpdateInput"
+      responses:
+        "200":
+          description: Updated withdrawal request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WithdrawalRequest"
+  /admin/tickets:
+    get:
+      operationId: getAdminTickets
+      tags: [admin]
+      summary: List all support tickets
+      responses:
+        "200":
+          description: Support tickets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SupportTicket"
+  /admin/tickets/{id}/status:
+    post:
+      operationId: updateTicketStatus
+      tags: [admin]
+      summary: Update a support ticket status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TicketStatusUpdateInput"
+      responses:
+        "200":
+          description: Updated support ticket
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupportTicket"
+  /kyc:
+    get:
+      operationId: getKyc
+      tags: [portfolio]
+      summary: Get the current user's KYC submission
+      responses:
+        "200":
+          description: KYC submission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KycSubmission"
+    post:
+      operationId: submitKyc
+      tags: [portfolio]
+      summary: Submit identity information for KYC review
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KycInput"
+      responses:
+        "201":
+          description: KYC submission created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KycSubmission"
+  /admin/kyc:
+    get:
+      operationId: getAdminKyc
+      tags: [admin]
+      summary: List KYC submissions
+      responses:
+        "200":
+          description: KYC submissions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/KycSubmission"
+  /admin/kyc/{id}/status:
+    post:
+      operationId: updateKycStatus
+      tags: [admin]
+      summary: Approve or reject a KYC submission
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KycStatusUpdateInput"
+      responses:
+        "200":
+          description: Updated KYC submission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KycSubmission"
+  /copy-trading:
+    get:
+      operationId: getCopyTrading
+      tags: [portfolio]
+      summary: Get demo copy-trading trader and allocation
+      responses:
+        "200":
+          description: Copy-trading demo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CopyTrading"
+    post:
+      operationId: createCopyAllocation
+      tags: [portfolio]
+      summary: Set a simulated copy-trading allocation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CopyAllocationInput"
+      responses:
+        "201":
+          description: Simulated allocation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CopyTrading"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +446,221 @@ components:
           type: string
       required:
         - status
+    MarketAsset:
+      type: object
+      required: [id, symbol, name, price, change24h, marketCap, lastUpdated]
+      properties:
+        id: { type: string }
+        symbol: { type: string }
+        name: { type: string }
+        image: { type: string }
+        price: { type: number }
+        change24h: { type: number }
+        marketCap: { type: number }
+        lastUpdated: { type: string, format: date-time }
+    Dashboard:
+      type: object
+      required: [balance, pendingBalance, totalDeposited, totalWithdrawn, referralRewards, recentActivity]
+      properties:
+        balance: { type: number }
+        pendingBalance: { type: number }
+        totalDeposited: { type: number }
+        totalWithdrawn: { type: number }
+        referralRewards: { type: number }
+        recentActivity:
+          type: array
+          items: { $ref: "#/components/schemas/Transaction" }
+    Transaction:
+      type: object
+      required: [id, type, amount, status, createdAt]
+      properties:
+        id: { type: string }
+        type: { type: string, enum: [deposit, withdrawal, referral, adjustment] }
+        amount: { type: number }
+        status: { type: string, enum: [completed, pending, rejected] }
+        reference: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+    DepositRequest:
+      type: object
+      required: [id, amount, status, network, address, createdAt]
+      properties:
+        id: { type: number }
+        amount: { type: number }
+        status: { type: string, enum: [awaiting_address, awaiting_transfer, pending_review, completed, rejected] }
+        network: { type: string, enum: [TRC20] }
+        address: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+    DepositInput:
+      type: object
+      required: [amount]
+      properties:
+        amount: { type: number, minimum: 1 }
+    DepositAddressInput:
+      type: object
+      required: [address]
+      properties:
+        address: { type: string, minLength: 20 }
+    WithdrawalRequest:
+      type: object
+      required: [id, amount, address, status, network, createdAt]
+      properties:
+        id: { type: number }
+        amount: { type: number }
+        address: { type: string }
+        status: { type: string, enum: [pending_review, processing, completed, rejected] }
+        network: { type: string, enum: [TRC20] }
+        createdAt: { type: string, format: date-time }
+    WithdrawalInput:
+      type: object
+      required: [amount, address]
+      properties:
+        amount: { type: number, minimum: 1 }
+        address: { type: string, minLength: 20 }
+    StatusUpdateInput:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [pending_review, processing, completed, rejected] }
+    ReferralSummary:
+      type: object
+      required: [code, link, totalReferred, activeReferred, earned, bonusRate, history]
+      properties:
+        code: { type: string }
+        link: { type: string }
+        totalReferred: { type: number }
+        activeReferred: { type: number }
+        earned: { type: number }
+        bonusRate: { type: number }
+        history:
+          type: array
+          items:
+            type: object
+            required: [id, email, joinedAt, reward]
+            properties:
+              id: { type: string }
+              email: { type: string }
+              joinedAt: { type: string, format: date-time }
+              reward: { type: number }
+    KycSubmission:
+      type: object
+      required: [id, fullName, dateOfBirth, country, documentType, documentNumber, documentReference, status, submittedAt]
+      properties:
+        id: { type: number }
+        fullName: { type: string }
+        dateOfBirth: { type: string, format: date }
+        country: { type: string }
+        documentType: { type: string, enum: [passport, national_id, drivers_license] }
+        documentNumber: { type: string }
+        documentReference: { type: string }
+        status: { type: string, enum: [pending, approved, rejected] }
+        rejectionReason: { type: ["string", "null"] }
+        submittedAt: { type: string, format: date-time }
+    KycInput:
+      type: object
+      required: [fullName, dateOfBirth, country, documentType, documentNumber, documentReference]
+      properties:
+        fullName: { type: string, minLength: 2 }
+        dateOfBirth: { type: string, format: date }
+        country: { type: string, minLength: 2 }
+        documentType: { type: string, enum: [passport, national_id, drivers_license] }
+        documentNumber: { type: string, minLength: 4 }
+        documentReference: { type: string, minLength: 1 }
+    KycStatusUpdateInput:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [pending, approved, rejected] }
+        rejectionReason: { type: ["string", "null"] }
+    CopyTrading:
+      type: object
+      required: [trader, allocation, isSimulated]
+      properties:
+        trader:
+          type: object
+          required: [name, title, avatar, dailyReturnMin, dailyReturnMax, riskLevel, followers, strategy, performance]
+          properties:
+            name: { type: string }
+            title: { type: string }
+            avatar: { type: string }
+            dailyReturnMin: { type: number }
+            dailyReturnMax: { type: number }
+            riskLevel: { type: string, enum: [low, medium, high] }
+            followers: { type: number }
+            strategy: { type: string }
+            performance:
+              type: array
+              items: { type: number }
+        allocation: { type: number }
+        isSimulated: { type: boolean }
+    CopyAllocationInput:
+      type: object
+      required: [amount]
+      properties:
+        amount: { type: number, minimum: 0 }
+    Faq:
+      type: object
+      required: [id, question, answer]
+      properties:
+        id: { type: number }
+        question: { type: string }
+        answer: { type: string }
+    SupportTicket:
+      type: object
+      required: [id, subject, category, message, status, createdAt, replies]
+      properties:
+        id: { type: number }
+        subject: { type: string }
+        category: { type: string }
+        message: { type: string }
+        status: { type: string, enum: [open, in_progress, closed] }
+        createdAt: { type: string, format: date-time }
+        replies:
+          type: array
+          items:
+            type: object
+            required: [id, author, message, createdAt]
+            properties:
+              id: { type: number }
+              author: { type: string }
+              message: { type: string }
+              createdAt: { type: string, format: date-time }
+    TicketInput:
+      type: object
+      required: [subject, category, message]
+      properties:
+        subject: { type: string, minLength: 3 }
+        category: { type: string }
+        message: { type: string, minLength: 10 }
+    TicketReplyInput:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string, minLength: 2 }
+    TicketStatusUpdateInput:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [open, in_progress, closed] }
+    AdminOverview:
+      type: object
+      required: [users, pendingDeposits, pendingWithdrawals, openTickets, volume, auditLogs]
+      properties:
+        users: { type: number }
+        pendingDeposits: { type: number }
+        pendingWithdrawals: { type: number }
+        openTickets: { type: number }
+        volume: { type: number }
+        auditLogs:
+          type: array
+          items:
+            type: object
+            required: [id, action, actor, amount, reason, createdAt, reference]
+            properties:
+              id: { type: number }
+              action: { type: string }
+              actor: { type: string }
+              amount: { type: number }
+              reason: { type: string }
+              createdAt: { type: string, format: date-time }
+              reference: { type: string }
 

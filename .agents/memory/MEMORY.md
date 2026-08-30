@@ -1,0 +1,1 @@
+- [Primevora artifact verification](primevora-artifact-verification.md) — standalone Vite builds need the artifact-managed PORT and BASE_PATH values; workflows inject both automatically.

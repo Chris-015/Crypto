@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Primevora Digital Asset Platform"
+description = "A secure, premium USDT-focused digital asset platform with user portfolio tools, deposit and withdrawal requests, live market data, referrals, customer support, and an auditable admin console."
+version = "1.0.0"
+id = "artifacts/primevora"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 24118
+
+[services.development]
+run = "pnpm --filter @workspace/primevora run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/primevora", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/primevora/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "24118"
+BASE_PATH = "/"

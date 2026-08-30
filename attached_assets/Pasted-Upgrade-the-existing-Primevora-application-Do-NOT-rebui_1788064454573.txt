@@ -1,0 +1,19 @@
+Upgrade the existing Primevora application. Do NOT rebuild the app from scratch and do NOT remove or overwrite existing features. Preserve the current design, database, authentication, pages and functionality, and add the following features to the existing project.
+
+1. KYC Verification: Add a KYC page where users submit their required identity information and documents. Add Pending, Approved and Rejected statuses. Admins must be able to review, approve or reject KYC submissions from the existing admin dashboard. Prevent withdrawals for users whose KYC is not approved.
+
+2. Referral Program: Add a referral system with unique referral links/codes. Give the referrer a 5% referral bonus after a referred user completes the platform's qualifying action. Add referral statistics, referred users, bonus history and referral records. Include protections against duplicate or fraudulent referrals.
+
+3. Withdrawal Upgrade: Users should first enter the amount they want to withdraw, then enter their USDT-TRC20 wallet address, review the applicable fee and final amount, and confirm the request. Send the request to the admin dashboard for processing.
+
+4. Copy Trading: Add a professional copy-trading section to the existing exchange interface. Feature Alex Scott as the Top Trader with 2%–6% daily simulated returns. Display trader profile, performance chart, risk level, followers, strategy and demo allocation controls. Clearly label these figures DEMO / SIMULATED PERFORMANCE unless verified live trading data is connected.
+
+5. Customer Care: Add a Customer Care section with FAQs and support tickets. Users can create tickets and admins can reply, manage and close them.
+
+6. Legal Pages: Add Terms & Conditions, Privacy Policy, Risk Disclosure and KYC/AML pages. Link them appropriately throughout the application.
+
+7. Exchange Design: Improve the existing interface so Primevora looks like a polished professional crypto exchange while preserving the current branding and functionality.
+
+8. Security: Preserve existing security features and use proper authentication, role-based permissions, server-side validation and environment variables. Never expose private keys, seed phrases or secret API credentials.
+
+Before making changes, inspect the existing project structure and integrate these features into the current architecture. Do not create duplicate pages, databases or authentication systems.
