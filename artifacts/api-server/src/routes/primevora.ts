@@ -38,6 +38,17 @@ import {
   UpdateKycStatusResponse,
   CreateCopyAllocationBody,
   CreateCopyAllocationResponse,
+  GetInvestmentResponse,
+  CreateInvestmentBody,
+  CreateInvestmentResponse,
+  UpdateInvestmentSettingsBody,
+  UpdateInvestmentSettingsResponse,
+  GetAdminInvestmentsResponse,
+  AdminAccrueInvestmentParams,
+  AdminAccrueInvestmentResponse,
+  AdminUpdateInvestmentSettingsParams,
+  AdminUpdateInvestmentSettingsBody,
+  AdminUpdateInvestmentSettingsResponse,
   UpdateWithdrawalStatusBody,
   UpdateWithdrawalStatusParams,
   UpdateWithdrawalStatusResponse,
@@ -105,6 +116,35 @@ type KycSubmission = {
   rejectionReason: string | null;
   submittedAt: Date;
   userId: string;
+};
+
+type InvestmentEarning = {
+  date: Date;
+  baseAmount: number;
+  profit: number;
+  portfolioValue: number;
+};
+
+type InvestmentRecord = {
+  userId: string;
+  investmentAmount: number;
+  dailyReturnPercentage: number;
+  compoundingEnabled: boolean;
+  investmentStartDate: Date | null;
+  lastAccruedDate: string | null;
+  totalAccumulatedSimulatedProfit: number;
+  currentSimulatedPortfolioValue: number;
+  earningsHistory: InvestmentEarning[];
+};
+
+type AuditLog = {
+  id: number;
+  action: string;
+  actor: string;
+  amount: number;
+  reason: string;
+  createdAt: Date;
+  reference: string;
 };
 
 const now = () => new Date();
@@ -214,15 +254,58 @@ const copyTrader = {
   riskLevel: "medium" as const,
   followers: 1842,
   strategy: "A diversified, momentum-led approach focused on liquid large-cap assets.",
+  portfolioAllocation: [
+    { asset: "BTC", percentage: 38 },
+    { asset: "ETH", percentage: 27 },
+    { asset: "SOL", percentage: 18 },
+    { asset: "USDT", percentage: 10 },
+    { asset: "Other", percentage: 7 },
+  ],
   performance: [2.1, 2.8, 2.4, 3.6, 3.1, 4.2, 3.8, 5.2, 4.6, 5.7, 5.1, 6.2],
 };
 
 let copyAllocation = 0;
 let nextKycId = 702;
 
+const investmentRecords: InvestmentRecord[] = [
+  {
+    userId: "demo-user",
+    investmentAmount: 5000,
+    dailyReturnPercentage: 3,
+    compoundingEnabled: false,
+    investmentStartDate: new Date("2026-08-25T00:00:00Z"),
+    lastAccruedDate: "2026-08-25",
+    totalAccumulatedSimulatedProfit: 0,
+    currentSimulatedPortfolioValue: 5000,
+    earningsHistory: [],
+  },
+];
+
+const auditLogs: AuditLog[] = [
+  {
+    id: 1,
+    action: "Deposit address assigned",
+    actor: "Operations",
+    amount: 2500,
+    reason: "Verified TRC20 deposit request",
+    createdAt: new Date("2026-08-27T09:45:00Z"),
+    reference: "AUD-77821",
+  },
+  {
+    id: 2,
+    action: "Balance adjustment",
+    actor: "Finance",
+    amount: 186.5,
+    reason: "Referral reward batch",
+    createdAt: new Date("2026-08-25T16:05:00Z"),
+    reference: "AUD-77794",
+  },
+];
+
 let nextDepositId = 24837;
 let nextWithdrawalId = 24761;
 let nextTicketId = 1043;
+let nextAuditId = 3;
 
 const faqs = [
   {
@@ -265,13 +348,94 @@ const publicTicket = (item: SupportTicket) => {
   return result;
 };
 
+const money = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
+const dateKey = (value: Date) => value.toISOString().slice(0, 10);
+const nextDateKey = (value: string) => {
+  const date = new Date(`${value}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + 1);
+  return dateKey(date);
+};
+
+const ensureInvestment = (userId: string) => {
+  const existing = investmentRecords.find((item) => item.userId === userId);
+  if (existing) return existing;
+  const blank: InvestmentRecord = {
+    userId,
+    investmentAmount: 0,
+    dailyReturnPercentage: 3,
+    compoundingEnabled: false,
+    investmentStartDate: null,
+    lastAccruedDate: null,
+    totalAccumulatedSimulatedProfit: 0,
+    currentSimulatedPortfolioValue: 0,
+    earningsHistory: [],
+  };
+  investmentRecords.push(blank);
+  return blank;
+};
+
+const accrueInvestment = (record: InvestmentRecord) => {
+  if (!record.investmentStartDate || record.investmentAmount <= 0) return;
+  const today = dateKey(now());
+  let earningDate = nextDateKey(record.lastAccruedDate ?? dateKey(record.investmentStartDate));
+  while (earningDate <= today) {
+    const baseAmount = record.compoundingEnabled
+      ? record.currentSimulatedPortfolioValue
+      : record.investmentAmount;
+    const profit = money(baseAmount * (record.dailyReturnPercentage / 100));
+    record.currentSimulatedPortfolioValue = money(record.currentSimulatedPortfolioValue + profit);
+    record.totalAccumulatedSimulatedProfit = money(record.totalAccumulatedSimulatedProfit + profit);
+    record.earningsHistory.push({
+      date: new Date(`${earningDate}T00:00:00.000Z`),
+      baseAmount: money(baseAmount),
+      profit,
+      portfolioValue: record.currentSimulatedPortfolioValue,
+    });
+    record.lastAccruedDate = earningDate;
+    earningDate = nextDateKey(earningDate);
+  }
+};
+
+const publicInvestment = (record: InvestmentRecord) => ({
+  investmentAmount: record.investmentAmount,
+  dailyReturnPercentage: record.dailyReturnPercentage,
+  dailySimulatedProfit: money(
+    (record.compoundingEnabled
+      ? record.currentSimulatedPortfolioValue
+      : record.investmentAmount) *
+      (record.dailyReturnPercentage / 100),
+  ),
+  totalAccumulatedSimulatedProfit: record.totalAccumulatedSimulatedProfit,
+  currentSimulatedPortfolioValue: record.currentSimulatedPortfolioValue,
+  investmentStartDate: record.investmentStartDate,
+  compoundingEnabled: record.compoundingEnabled,
+  earningsHistory: record.earningsHistory,
+});
+
+const adminInvestment = (record: InvestmentRecord) => ({
+  ...publicInvestment(record),
+  userId: record.userId,
+});
+
+const addAuditLog = (action: string, amount: number, reason: string) => {
+  auditLogs.unshift({
+    id: nextAuditId++,
+    action,
+    actor: "Operations",
+    amount,
+    reason,
+    createdAt: now(),
+    reference: `AUD-${nextAuditId + 77800}`,
+  });
+};
+
 const router: IRouter = Router();
 
 router.get("/market", async (req, res): Promise<void> => {
-  const ids = "bitcoin,ethereum,solana,binancecoin,ripple,dogecoin,tether";
+  const ids = "bitcoin,ethereum,tether,binancecoin,solana,usd-coin,ripple,dogecoin,cardano,tron";
   try {
     const response = await fetch(
-      `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${ids}&order=market_cap_desc&per_page=7&page=1&sparkline=false`,
+      `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${ids}&order=market_cap_desc&per_page=10&page=1&sparkline=false`,
       { headers: { accept: "application/json" } },
     );
     if (!response.ok) {
@@ -319,6 +483,47 @@ router.get("/dashboard", (_req, res) => {
     recentActivity: transactions,
   };
   res.json(GetDashboardResponse.parse(data));
+});
+
+router.get("/investment", (req, res) => {
+  const record = ensureInvestment(userIdFor(req));
+  accrueInvestment(record);
+  res.json(GetInvestmentResponse.parse(publicInvestment(record)));
+});
+
+router.post("/investment", (req, res) => {
+  const parsed = CreateInvestmentBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const record = ensureInvestment(userIdFor(req));
+  if (record.investmentAmount > 0) {
+    res.status(409).json({ error: "An investment has already been started for this account" });
+    return;
+  }
+  record.investmentAmount = money(parsed.data.amount);
+  record.currentSimulatedPortfolioValue = record.investmentAmount;
+  record.compoundingEnabled = parsed.data.compoundingEnabled;
+  record.investmentStartDate = now();
+  record.lastAccruedDate = dateKey(record.investmentStartDate);
+  res.status(201).json(CreateInvestmentResponse.parse(publicInvestment(record)));
+});
+
+router.post("/investment/settings", (req, res) => {
+  const parsed = UpdateInvestmentSettingsBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const record = ensureInvestment(userIdFor(req));
+  if (record.investmentAmount <= 0) {
+    res.status(400).json({ error: "Start an investment before changing its settings" });
+    return;
+  }
+  accrueInvestment(record);
+  record.compoundingEnabled = parsed.data.compoundingEnabled;
+  res.json(UpdateInvestmentSettingsResponse.parse(publicInvestment(record)));
 });
 
 router.get("/transactions", (_req, res) => {
@@ -543,32 +748,63 @@ router.get("/admin/overview", (_req, res) => {
       pendingWithdrawals: withdrawals.filter((item) => item.status === "pending_review").length,
       openTickets: tickets.filter((item) => item.status !== "closed").length,
       volume: 284650,
-      auditLogs: [
-        {
-          id: 1,
-          action: "Deposit address assigned",
-          actor: "Operations",
-          amount: 2500,
-          reason: "Verified TRC20 deposit request",
-          createdAt: new Date("2026-08-27T09:45:00Z"),
-          reference: "AUD-77821",
-        },
-        {
-          id: 2,
-          action: "Balance adjustment",
-          actor: "Finance",
-          amount: 186.5,
-          reason: "Referral reward batch",
-          createdAt: new Date("2026-08-25T16:05:00Z"),
-          reference: "AUD-77794",
-        },
-      ],
+      auditLogs,
     }),
   );
 });
 
 router.get("/admin/deposits", (_req, res) => {
   res.json(GetAdminDepositsResponse.parse(deposits.map(publicDeposit)));
+});
+
+router.get("/admin/investments", (_req, res) => {
+  investmentRecords.forEach(accrueInvestment);
+  res.json(GetAdminInvestmentsResponse.parse(investmentRecords.map(adminInvestment)));
+});
+
+router.post("/admin/investments/:userId/accrue", (req, res) => {
+  const params = AdminAccrueInvestmentParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: "Invalid investment user" });
+    return;
+  }
+  const record = investmentRecords.find((item) => item.userId === params.data.userId);
+  if (!record) {
+    res.status(404).json({ error: "Investment record not found" });
+    return;
+  }
+  const previousEarnings = record.earningsHistory.length;
+  accrueInvestment(record);
+  if (record.earningsHistory.length > previousEarnings) {
+    addAuditLog(
+      "Daily simulated earning accrued",
+      publicInvestment(record).dailySimulatedProfit,
+      `Recorded a non-withdrawable ${record.dailyReturnPercentage}% simulated earning for ${record.userId}`,
+    );
+  }
+  res.json(AdminAccrueInvestmentResponse.parse(adminInvestment(record)));
+});
+
+router.post("/admin/investments/:userId/settings", (req, res) => {
+  const params = AdminUpdateInvestmentSettingsParams.safeParse(req.params);
+  const parsed = AdminUpdateInvestmentSettingsBody.safeParse(req.body);
+  if (!params.success || !parsed.success) {
+    res.status(400).json({ error: "Invalid investment settings" });
+    return;
+  }
+  const record = investmentRecords.find((item) => item.userId === params.data.userId);
+  if (!record) {
+    res.status(404).json({ error: "Investment record not found" });
+    return;
+  }
+  accrueInvestment(record);
+  record.compoundingEnabled = parsed.data.compoundingEnabled;
+  addAuditLog(
+    "Investment compounding setting updated",
+    record.investmentAmount,
+    `${record.userId} compounding ${record.compoundingEnabled ? "enabled" : "disabled"}`,
+  );
+  res.json(AdminUpdateInvestmentSettingsResponse.parse(adminInvestment(record)));
 });
 
 router.post("/admin/deposits/:id/address", (req, res) => {

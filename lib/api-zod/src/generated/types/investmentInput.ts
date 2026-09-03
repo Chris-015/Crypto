@@ -6,10 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface DepositInput {
-  /**
-     * @minimum 500
-     * @maximum 50000
-     */
+export interface InvestmentInput {
+  /** @minimum 1 */
   amount: number;
+  compoundingEnabled: boolean;
 }

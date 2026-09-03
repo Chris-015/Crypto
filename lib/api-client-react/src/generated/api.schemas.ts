@@ -87,7 +87,10 @@ export interface DepositRequest {
 }
 
 export interface DepositInput {
-  /** @minimum 1 */
+  /**
+     * @minimum 500
+     * @maximum 50000
+     */
   amount: number;
 }
 
@@ -238,6 +241,11 @@ export const CopyTradingTraderRiskLevel = {
   high: 'high',
 } as const;
 
+export type CopyTradingTraderPortfolioAllocationItem = {
+  asset: string;
+  percentage: number;
+};
+
 export type CopyTradingTrader = {
   name: string;
   title: string;
@@ -247,6 +255,7 @@ export type CopyTradingTrader = {
   riskLevel: CopyTradingTraderRiskLevel;
   followers: number;
   strategy: string;
+  portfolioAllocation: CopyTradingTraderPortfolioAllocationItem[];
   performance: number[];
 };
 
@@ -259,6 +268,39 @@ export interface CopyTrading {
 export interface CopyAllocationInput {
   /** @minimum 0 */
   amount: number;
+}
+
+export interface InvestmentEarning {
+  date: string;
+  baseAmount: number;
+  profit: number;
+  portfolioValue: number;
+}
+
+export interface InvestmentRecord {
+  investmentAmount: number;
+  dailyReturnPercentage: number;
+  dailySimulatedProfit: number;
+  totalAccumulatedSimulatedProfit: number;
+  currentSimulatedPortfolioValue: number;
+  /** @nullable */
+  investmentStartDate: string | null;
+  compoundingEnabled: boolean;
+  earningsHistory: InvestmentEarning[];
+}
+
+export type AdminInvestmentRecord = InvestmentRecord & {
+  userId: string;
+};
+
+export interface InvestmentInput {
+  /** @minimum 1 */
+  amount: number;
+  compoundingEnabled: boolean;
+}
+
+export interface InvestmentSettingsInput {
+  compoundingEnabled: boolean;
 }
 
 export interface Faq {

@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { CopyTradingTraderPortfolioAllocationItem } from './copyTradingTraderPortfolioAllocationItem';
 import type { CopyTradingTraderRiskLevel } from './copyTradingTraderRiskLevel';
 
 export type CopyTradingTrader = {
@@ -16,5 +17,6 @@ export type CopyTradingTrader = {
   riskLevel: CopyTradingTraderRiskLevel;
   followers: number;
   strategy: string;
+  portfolioAllocation: CopyTradingTraderPortfolioAllocationItem[];
   performance: number[];
 };

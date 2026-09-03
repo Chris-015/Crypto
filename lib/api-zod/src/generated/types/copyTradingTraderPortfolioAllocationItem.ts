@@ -6,10 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface DepositInput {
-  /**
-     * @minimum 500
-     * @maximum 50000
-     */
-  amount: number;
-}
+export type CopyTradingTraderPortfolioAllocationItem = {
+  asset: string;
+  percentage: number;
+};

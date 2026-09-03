@@ -58,6 +58,53 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Dashboard"
+  /investment:
+    get:
+      operationId: getInvestment
+      tags: [portfolio]
+      summary: Get the current user's simulated investment dashboard
+      responses:
+        "200":
+          description: Simulated investment dashboard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvestmentRecord"
+    post:
+      operationId: createInvestment
+      tags: [portfolio]
+      summary: Start a simulated investment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvestmentInput"
+      responses:
+        "201":
+          description: Simulated investment created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvestmentRecord"
+  /investment/settings:
+    post:
+      operationId: updateInvestmentSettings
+      tags: [portfolio]
+      summary: Update simulated investment settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvestmentSettingsInput"
+      responses:
+        "200":
+          description: Updated simulated investment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvestmentRecord"
   /transactions:
     get:
       operationId: getTransactions
@@ -241,6 +288,62 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/DepositRequest"
+  /admin/investments:
+    get:
+      operationId: getAdminInvestments
+      tags: [admin]
+      summary: List simulated investment records
+      responses:
+        "200":
+          description: Simulated investment records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminInvestmentRecord"
+  /admin/investments/{userId}/accrue:
+    post:
+      operationId: adminAccrueInvestment
+      tags: [admin]
+      summary: Accrue the current daily simulated investment earning
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Updated simulated investment record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminInvestmentRecord"
+  /admin/investments/{userId}/settings:
+    post:
+      operationId: adminUpdateInvestmentSettings
+      tags: [admin]
+      summary: Update a user's simulated investment settings
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvestmentSettingsInput"
+      responses:
+        "200":
+          description: Updated simulated investment record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminInvestmentRecord"
   /admin/deposits/{id}/address:
     post:
       operationId: assignDepositAddress
@@ -494,7 +597,7 @@ components:
       type: object
       required: [amount]
       properties:
-        amount: { type: number, minimum: 1 }
+        amount: { type: number, minimum: 500, maximum: 50000 }
     DepositAddressInput:
       type: object
       required: [address]
@@ -577,7 +680,7 @@ components:
       properties:
         trader:
           type: object
-          required: [name, title, avatar, dailyReturnMin, dailyReturnMax, riskLevel, followers, strategy, performance]
+          required: [name, title, avatar, dailyReturnMin, dailyReturnMax, riskLevel, followers, strategy, portfolioAllocation, performance]
           properties:
             name: { type: string }
             title: { type: string }
@@ -587,6 +690,14 @@ components:
             riskLevel: { type: string, enum: [low, medium, high] }
             followers: { type: number }
             strategy: { type: string }
+            portfolioAllocation:
+              type: array
+              items:
+                type: object
+                required: [asset, percentage]
+                properties:
+                  asset: { type: string }
+                  percentage: { type: number }
             performance:
               type: array
               items: { type: number }
@@ -597,6 +708,47 @@ components:
       required: [amount]
       properties:
         amount: { type: number, minimum: 0 }
+    InvestmentEarning:
+      type: object
+      required: [date, baseAmount, profit, portfolioValue]
+      properties:
+        date: { type: string, format: date }
+        baseAmount: { type: number }
+        profit: { type: number }
+        portfolioValue: { type: number }
+    InvestmentRecord:
+      type: object
+      required: [investmentAmount, dailyReturnPercentage, dailySimulatedProfit, totalAccumulatedSimulatedProfit, currentSimulatedPortfolioValue, investmentStartDate, compoundingEnabled, earningsHistory]
+      properties:
+        investmentAmount: { type: number }
+        dailyReturnPercentage: { type: number }
+        dailySimulatedProfit: { type: number }
+        totalAccumulatedSimulatedProfit: { type: number }
+        currentSimulatedPortfolioValue: { type: number }
+        investmentStartDate: { type: ["string", "null"], format: date }
+        compoundingEnabled: { type: boolean }
+        earningsHistory:
+          type: array
+          items:
+            $ref: "#/components/schemas/InvestmentEarning"
+    AdminInvestmentRecord:
+      allOf:
+        - $ref: "#/components/schemas/InvestmentRecord"
+        - type: object
+          required: [userId]
+          properties:
+            userId: { type: string }
+    InvestmentInput:
+      type: object
+      required: [amount, compoundingEnabled]
+      properties:
+        amount: { type: number, minimum: 1 }
+        compoundingEnabled: { type: boolean }
+    InvestmentSettingsInput:
+      type: object
+      required: [compoundingEnabled]
+      properties:
+        compoundingEnabled: { type: boolean }
     Faq:
       type: object
       required: [id, question, answer]

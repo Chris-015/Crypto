@@ -6,11 +6,13 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './adminInvestmentRecord';
 export * from './adminOverview';
 export * from './adminOverviewAuditLogsItem';
 export * from './copyAllocationInput';
 export * from './copyTrading';
 export * from './copyTradingTrader';
+export * from './copyTradingTraderPortfolioAllocationItem';
 export * from './copyTradingTraderRiskLevel';
 export * from './dashboard';
 export * from './depositAddressInput';
@@ -20,6 +22,10 @@ export * from './depositRequestNetwork';
 export * from './depositRequestStatus';
 export * from './faq';
 export * from './healthStatus';
+export * from './investmentEarning';
+export * from './investmentInput';
+export * from './investmentRecord';
+export * from './investmentSettingsInput';
 export * from './kycInput';
 export * from './kycInputDocumentType';
 export * from './kycStatusUpdateInput';
