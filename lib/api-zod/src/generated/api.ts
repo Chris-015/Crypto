@@ -54,68 +54,18 @@ export const GetDashboardResponse = zod.object({
 
 
 /**
- * @summary Get the current user's simulated investment dashboard
+ * @summary Get the current user's admin-reported investment dashboard
  */
 export const GetInvestmentResponse = zod.object({
   "investmentAmount": zod.number(),
   "dailyReturnPercentage": zod.number(),
-  "dailySimulatedProfit": zod.number(),
-  "totalAccumulatedSimulatedProfit": zod.number(),
-  "currentSimulatedPortfolioValue": zod.number(),
+  "dailyProfit": zod.number(),
+  "totalAccumulatedProfit": zod.number(),
+  "currentPortfolioValue": zod.number(),
   "investmentStartDate": zod.coerce.date().nullable(),
   "compoundingEnabled": zod.boolean(),
-  "earningsHistory": zod.array(zod.object({
-  "date": zod.coerce.date(),
-  "baseAmount": zod.number(),
-  "profit": zod.number(),
-  "portfolioValue": zod.number()
-}))
-})
-
-
-/**
- * @summary Start a simulated investment
- */
-
-
-
-export const CreateInvestmentBody = zod.object({
-  "amount": zod.number().min(1),
-  "compoundingEnabled": zod.boolean()
-})
-
-export const CreateInvestmentResponse = zod.object({
-  "investmentAmount": zod.number(),
-  "dailyReturnPercentage": zod.number(),
-  "dailySimulatedProfit": zod.number(),
-  "totalAccumulatedSimulatedProfit": zod.number(),
-  "currentSimulatedPortfolioValue": zod.number(),
-  "investmentStartDate": zod.coerce.date().nullable(),
-  "compoundingEnabled": zod.boolean(),
-  "earningsHistory": zod.array(zod.object({
-  "date": zod.coerce.date(),
-  "baseAmount": zod.number(),
-  "profit": zod.number(),
-  "portfolioValue": zod.number()
-}))
-})
-
-
-/**
- * @summary Update simulated investment settings
- */
-export const UpdateInvestmentSettingsBody = zod.object({
-  "compoundingEnabled": zod.boolean()
-})
-
-export const UpdateInvestmentSettingsResponse = zod.object({
-  "investmentAmount": zod.number(),
-  "dailyReturnPercentage": zod.number(),
-  "dailySimulatedProfit": zod.number(),
-  "totalAccumulatedSimulatedProfit": zod.number(),
-  "currentSimulatedPortfolioValue": zod.number(),
-  "investmentStartDate": zod.coerce.date().nullable(),
-  "compoundingEnabled": zod.boolean(),
+  "reportingMode": zod.enum(['admin_reported']),
+  "isWithdrawable": zod.boolean(),
   "earningsHistory": zod.array(zod.object({
   "date": zod.coerce.date(),
   "baseAmount": zod.number(),
@@ -360,16 +310,18 @@ export const GetAdminDepositsResponse = zod.array(GetAdminDepositsResponseItem)
 
 
 /**
- * @summary List simulated investment records
+ * @summary List admin-reported investment records
  */
 export const GetAdminInvestmentsResponseItem = zod.object({
   "investmentAmount": zod.number(),
   "dailyReturnPercentage": zod.number(),
-  "dailySimulatedProfit": zod.number(),
-  "totalAccumulatedSimulatedProfit": zod.number(),
-  "currentSimulatedPortfolioValue": zod.number(),
+  "dailyProfit": zod.number(),
+  "totalAccumulatedProfit": zod.number(),
+  "currentPortfolioValue": zod.number(),
   "investmentStartDate": zod.coerce.date().nullable(),
   "compoundingEnabled": zod.boolean(),
+  "reportingMode": zod.enum(['admin_reported']),
+  "isWithdrawable": zod.boolean(),
   "earningsHistory": zod.array(zod.object({
   "date": zod.coerce.date(),
   "baseAmount": zod.number(),
@@ -383,7 +335,7 @@ export const GetAdminInvestmentsResponse = zod.array(GetAdminInvestmentsResponse
 
 
 /**
- * @summary Accrue the current daily simulated investment earning
+ * @summary Accrue the current daily admin-reported investment earning
  */
 export const AdminAccrueInvestmentParams = zod.object({
   "userId": zod.coerce.string()
@@ -392,11 +344,13 @@ export const AdminAccrueInvestmentParams = zod.object({
 export const AdminAccrueInvestmentResponse = zod.object({
   "investmentAmount": zod.number(),
   "dailyReturnPercentage": zod.number(),
-  "dailySimulatedProfit": zod.number(),
-  "totalAccumulatedSimulatedProfit": zod.number(),
-  "currentSimulatedPortfolioValue": zod.number(),
+  "dailyProfit": zod.number(),
+  "totalAccumulatedProfit": zod.number(),
+  "currentPortfolioValue": zod.number(),
   "investmentStartDate": zod.coerce.date().nullable(),
   "compoundingEnabled": zod.boolean(),
+  "reportingMode": zod.enum(['admin_reported']),
+  "isWithdrawable": zod.boolean(),
   "earningsHistory": zod.array(zod.object({
   "date": zod.coerce.date(),
   "baseAmount": zod.number(),
@@ -409,24 +363,34 @@ export const AdminAccrueInvestmentResponse = zod.object({
 
 
 /**
- * @summary Update a user's simulated investment settings
+ * @summary Set a user's admin-reported investment figures
  */
-export const AdminUpdateInvestmentSettingsParams = zod.object({
+export const AdminSetInvestmentFiguresParams = zod.object({
   "userId": zod.coerce.string()
 })
 
-export const AdminUpdateInvestmentSettingsBody = zod.object({
-  "compoundingEnabled": zod.boolean()
+export const adminSetInvestmentFiguresBodyInvestmentAmountMin = 0;
+
+export const adminSetInvestmentFiguresBodyDailyReturnPercentageMin = 0;
+export const adminSetInvestmentFiguresBodyDailyReturnPercentageMax = 100;
+
+
+
+export const AdminSetInvestmentFiguresBody = zod.object({
+  "investmentAmount": zod.number().min(adminSetInvestmentFiguresBodyInvestmentAmountMin),
+  "dailyReturnPercentage": zod.number().min(adminSetInvestmentFiguresBodyDailyReturnPercentageMin).max(adminSetInvestmentFiguresBodyDailyReturnPercentageMax)
 })
 
-export const AdminUpdateInvestmentSettingsResponse = zod.object({
+export const AdminSetInvestmentFiguresResponse = zod.object({
   "investmentAmount": zod.number(),
   "dailyReturnPercentage": zod.number(),
-  "dailySimulatedProfit": zod.number(),
-  "totalAccumulatedSimulatedProfit": zod.number(),
-  "currentSimulatedPortfolioValue": zod.number(),
+  "dailyProfit": zod.number(),
+  "totalAccumulatedProfit": zod.number(),
+  "currentPortfolioValue": zod.number(),
   "investmentStartDate": zod.coerce.date().nullable(),
   "compoundingEnabled": zod.boolean(),
+  "reportingMode": zod.enum(['admin_reported']),
+  "isWithdrawable": zod.boolean(),
   "earningsHistory": zod.array(zod.object({
   "date": zod.coerce.date(),
   "baseAmount": zod.number(),
@@ -642,7 +606,7 @@ export const UpdateKycStatusResponse = zod.object({
 
 
 /**
- * @summary Get demo copy-trading trader and allocation
+ * @summary Get admin-reported copy-trading trader and allocation
  */
 export const GetCopyTradingResponse = zod.object({
   "trader": zod.object({
@@ -661,12 +625,12 @@ export const GetCopyTradingResponse = zod.object({
   "performance": zod.array(zod.number())
 }),
   "allocation": zod.number(),
-  "isSimulated": zod.boolean()
+  "reportingMode": zod.enum(['admin_reported'])
 })
 
 
 /**
- * @summary Set a simulated copy-trading allocation
+ * @summary Set a copy-trading allocation
  */
 export const createCopyAllocationBodyAmountMin = 0;
 
@@ -693,7 +657,7 @@ export const CreateCopyAllocationResponse = zod.object({
   "performance": zod.array(zod.number())
 }),
   "allocation": zod.number(),
-  "isSimulated": zod.boolean()
+  "reportingMode": zod.enum(['admin_reported'])
 })
 
 

@@ -62,45 +62,10 @@ paths:
     get:
       operationId: getInvestment
       tags: [portfolio]
-      summary: Get the current user's simulated investment dashboard
+      summary: Get the current user's admin-reported investment dashboard
       responses:
         "200":
-          description: Simulated investment dashboard
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/InvestmentRecord"
-    post:
-      operationId: createInvestment
-      tags: [portfolio]
-      summary: Start a simulated investment
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/InvestmentInput"
-      responses:
-        "201":
-          description: Simulated investment created
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/InvestmentRecord"
-  /investment/settings:
-    post:
-      operationId: updateInvestmentSettings
-      tags: [portfolio]
-      summary: Update simulated investment settings
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/InvestmentSettingsInput"
-      responses:
-        "200":
-          description: Updated simulated investment
+          description: Admin-reported investment dashboard
           content:
             application/json:
               schema:
@@ -292,10 +257,10 @@ paths:
     get:
       operationId: getAdminInvestments
       tags: [admin]
-      summary: List simulated investment records
+      summary: List admin-reported investment records
       responses:
         "200":
-          description: Simulated investment records
+          description: Admin-reported investment records
           content:
             application/json:
               schema:
@@ -306,7 +271,7 @@ paths:
     post:
       operationId: adminAccrueInvestment
       tags: [admin]
-      summary: Accrue the current daily simulated investment earning
+      summary: Accrue the current daily admin-reported investment earning
       parameters:
         - name: userId
           in: path
@@ -315,16 +280,16 @@ paths:
             type: string
       responses:
         "200":
-          description: Updated simulated investment record
+          description: Updated admin-reported investment record
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/AdminInvestmentRecord"
-  /admin/investments/{userId}/settings:
-    post:
-      operationId: adminUpdateInvestmentSettings
+  /admin/investments/{userId}:
+    put:
+      operationId: adminSetInvestmentFigures
       tags: [admin]
-      summary: Update a user's simulated investment settings
+      summary: Set a user's admin-reported investment figures
       parameters:
         - name: userId
           in: path
@@ -336,10 +301,10 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/InvestmentSettingsInput"
+                $ref: "#/components/schemas/AdminSetInvestmentFiguresInput"
       responses:
         "200":
-          description: Updated simulated investment record
+          description: Updated admin-reported investment record
           content:
             application/json:
               schema:
@@ -515,10 +480,10 @@ paths:
     get:
       operationId: getCopyTrading
       tags: [portfolio]
-      summary: Get demo copy-trading trader and allocation
+      summary: Get admin-reported copy-trading trader and allocation
       responses:
         "200":
-          description: Copy-trading demo
+          description: Copy-trading profile
           content:
             application/json:
               schema:
@@ -526,7 +491,7 @@ paths:
     post:
       operationId: createCopyAllocation
       tags: [portfolio]
-      summary: Set a simulated copy-trading allocation
+      summary: Set a copy-trading allocation
       requestBody:
         required: true
         content:
@@ -535,7 +500,7 @@ paths:
               $ref: "#/components/schemas/CopyAllocationInput"
       responses:
         "201":
-          description: Simulated allocation
+          description: Copy-trading allocation
           content:
             application/json:
               schema:
@@ -676,7 +641,7 @@ components:
         rejectionReason: { type: ["string", "null"] }
     CopyTrading:
       type: object
-      required: [trader, allocation, isSimulated]
+      required: [trader, allocation, reportingMode]
       properties:
         trader:
           type: object
@@ -702,7 +667,7 @@ components:
               type: array
               items: { type: number }
         allocation: { type: number }
-        isSimulated: { type: boolean }
+        reportingMode: { type: string, enum: [admin_reported] }
     CopyAllocationInput:
       type: object
       required: [amount]
@@ -718,15 +683,17 @@ components:
         portfolioValue: { type: number }
     InvestmentRecord:
       type: object
-      required: [investmentAmount, dailyReturnPercentage, dailySimulatedProfit, totalAccumulatedSimulatedProfit, currentSimulatedPortfolioValue, investmentStartDate, compoundingEnabled, earningsHistory]
+      required: [investmentAmount, dailyReturnPercentage, dailyProfit, totalAccumulatedProfit, currentPortfolioValue, investmentStartDate, compoundingEnabled, reportingMode, isWithdrawable, earningsHistory]
       properties:
         investmentAmount: { type: number }
         dailyReturnPercentage: { type: number }
-        dailySimulatedProfit: { type: number }
-        totalAccumulatedSimulatedProfit: { type: number }
-        currentSimulatedPortfolioValue: { type: number }
+        dailyProfit: { type: number }
+        totalAccumulatedProfit: { type: number }
+        currentPortfolioValue: { type: number }
         investmentStartDate: { type: ["string", "null"], format: date }
         compoundingEnabled: { type: boolean }
+        reportingMode: { type: string, enum: [admin_reported] }
+        isWithdrawable: { type: boolean }
         earningsHistory:
           type: array
           items:
@@ -738,17 +705,12 @@ components:
           required: [userId]
           properties:
             userId: { type: string }
-    InvestmentInput:
+    AdminSetInvestmentFiguresInput:
       type: object
-      required: [amount, compoundingEnabled]
+      required: [investmentAmount, dailyReturnPercentage]
       properties:
-        amount: { type: number, minimum: 1 }
-        compoundingEnabled: { type: boolean }
-    InvestmentSettingsInput:
-      type: object
-      required: [compoundingEnabled]
-      properties:
-        compoundingEnabled: { type: boolean }
+        investmentAmount: { type: number, minimum: 0 }
+        dailyReturnPercentage: { type: number, minimum: 0, maximum: 100 }
     Faq:
       type: object
       required: [id, question, answer]

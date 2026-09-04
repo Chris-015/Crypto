@@ -22,6 +22,7 @@ import type {
 import type {
   AdminInvestmentRecord,
   AdminOverview,
+  AdminSetInvestmentFiguresInput,
   CopyAllocationInput,
   CopyTrading,
   Dashboard,
@@ -30,9 +31,7 @@ import type {
   DepositRequest,
   Faq,
   HealthStatus,
-  InvestmentInput,
   InvestmentRecord,
-  InvestmentSettingsInput,
   KycInput,
   KycStatusUpdateInput,
   KycSubmission,
@@ -316,7 +315,7 @@ export const getGetInvestmentUrl = () => {
 }
 
 /**
- * @summary Get the current user's simulated investment dashboard
+ * @summary Get the current user's admin-reported investment dashboard
  */
 export const getInvestment = async ( options?: Parameters<typeof customFetch>[1]): Promise<InvestmentRecord> => {
 
@@ -363,7 +362,7 @@ export type GetInvestmentQueryError = ErrorType<unknown>
 
 
 /**
- * @summary Get the current user's simulated investment dashboard
+ * @summary Get the current user's admin-reported investment dashboard
  */
 
 export function useGetInvestment<TData = Awaited<ReturnType<typeof getInvestment>>, TError = ErrorType<unknown>>(
@@ -383,148 +382,6 @@ export function useGetInvestment<TData = Awaited<ReturnType<typeof getInvestment
 
 
 
-
-export const getCreateInvestmentUrl = () => {
-
-
-
-
-  return `/api/investment`
-}
-
-/**
- * @summary Start a simulated investment
- */
-export const createInvestment = async (investmentInput: InvestmentInput, options?: Parameters<typeof customFetch>[1]): Promise<InvestmentRecord> => {
-
-  return customFetch<InvestmentRecord>(getCreateInvestmentUrl(),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(investmentInput)
-  }
-);}
-
-
-
-
-
-export const getCreateInvestmentMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createInvestment>>, TError,{data: BodyType<InvestmentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof createInvestment>>, TError,{data: BodyType<InvestmentInput>}, TContext> => {
-
-const mutationKey = ['createInvestment'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createInvestment>>, {data: BodyType<InvestmentInput>}> = (props) => {
-          const {data} = props ?? {};
-
-          return  createInvestment(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type CreateInvestmentMutationResult = NonNullable<Awaited<ReturnType<typeof createInvestment>>>
-    export type CreateInvestmentMutationBody = BodyType<InvestmentInput>
-    export type CreateInvestmentMutationError = ErrorType<unknown>
-
-    /**
- * @summary Start a simulated investment
- */
-export const useCreateInvestment = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createInvestment>>, TError,{data: BodyType<InvestmentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof createInvestment>>,
-        TError,
-        {data: BodyType<InvestmentInput>},
-        TContext
-      > => {
-      return useMutation(getCreateInvestmentMutationOptions(options));
-    }
-
-export const getUpdateInvestmentSettingsUrl = () => {
-
-
-
-
-  return `/api/investment/settings`
-}
-
-/**
- * @summary Update simulated investment settings
- */
-export const updateInvestmentSettings = async (investmentSettingsInput: InvestmentSettingsInput, options?: Parameters<typeof customFetch>[1]): Promise<InvestmentRecord> => {
-
-  return customFetch<InvestmentRecord>(getUpdateInvestmentSettingsUrl(),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(investmentSettingsInput)
-  }
-);}
-
-
-
-
-
-export const getUpdateInvestmentSettingsMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateInvestmentSettings>>, TError,{data: BodyType<InvestmentSettingsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof updateInvestmentSettings>>, TError,{data: BodyType<InvestmentSettingsInput>}, TContext> => {
-
-const mutationKey = ['updateInvestmentSettings'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateInvestmentSettings>>, {data: BodyType<InvestmentSettingsInput>}> = (props) => {
-          const {data} = props ?? {};
-
-          return  updateInvestmentSettings(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type UpdateInvestmentSettingsMutationResult = NonNullable<Awaited<ReturnType<typeof updateInvestmentSettings>>>
-    export type UpdateInvestmentSettingsMutationBody = BodyType<InvestmentSettingsInput>
-    export type UpdateInvestmentSettingsMutationError = ErrorType<unknown>
-
-    /**
- * @summary Update simulated investment settings
- */
-export const useUpdateInvestmentSettings = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateInvestmentSettings>>, TError,{data: BodyType<InvestmentSettingsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof updateInvestmentSettings>>,
-        TError,
-        {data: BodyType<InvestmentSettingsInput>},
-        TContext
-      > => {
-      return useMutation(getUpdateInvestmentSettingsMutationOptions(options));
-    }
 
 export const getGetTransactionsUrl = () => {
 
@@ -1436,7 +1293,7 @@ export const getGetAdminInvestmentsUrl = () => {
 }
 
 /**
- * @summary List simulated investment records
+ * @summary List admin-reported investment records
  */
 export const getAdminInvestments = async ( options?: Parameters<typeof customFetch>[1]): Promise<AdminInvestmentRecord[]> => {
 
@@ -1483,7 +1340,7 @@ export type GetAdminInvestmentsQueryError = ErrorType<unknown>
 
 
 /**
- * @summary List simulated investment records
+ * @summary List admin-reported investment records
  */
 
 export function useGetAdminInvestments<TData = Awaited<ReturnType<typeof getAdminInvestments>>, TError = ErrorType<unknown>>(
@@ -1513,7 +1370,7 @@ export const getAdminAccrueInvestmentUrl = (userId: string,) => {
 }
 
 /**
- * @summary Accrue the current daily simulated investment earning
+ * @summary Accrue the current daily admin-reported investment earning
  */
 export const adminAccrueInvestment = async (userId: string, options?: Parameters<typeof customFetch>[1]): Promise<AdminInvestmentRecord> => {
 
@@ -1562,7 +1419,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type AdminAccrueInvestmentMutationError = ErrorType<unknown>
 
     /**
- * @summary Accrue the current daily simulated investment earning
+ * @summary Accrue the current daily admin-reported investment earning
  */
 export const useAdminAccrueInvestment = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminAccrueInvestment>>, TError,{userId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -1575,26 +1432,26 @@ export const useAdminAccrueInvestment = <TError = ErrorType<unknown>,
       return useMutation(getAdminAccrueInvestmentMutationOptions(options));
     }
 
-export const getAdminUpdateInvestmentSettingsUrl = (userId: string,) => {
+export const getAdminSetInvestmentFiguresUrl = (userId: string,) => {
 
 
 
 
-  return `/api/admin/investments/${userId}/settings`
+  return `/api/admin/investments/${userId}`
 }
 
 /**
- * @summary Update a user's simulated investment settings
+ * @summary Set a user's admin-reported investment figures
  */
-export const adminUpdateInvestmentSettings = async (userId: string,
-    investmentSettingsInput: InvestmentSettingsInput, options?: Parameters<typeof customFetch>[1]): Promise<AdminInvestmentRecord> => {
+export const adminSetInvestmentFigures = async (userId: string,
+    adminSetInvestmentFiguresInput: AdminSetInvestmentFiguresInput, options?: Parameters<typeof customFetch>[1]): Promise<AdminInvestmentRecord> => {
 
-  return customFetch<AdminInvestmentRecord>(getAdminUpdateInvestmentSettingsUrl(userId),
+  return customFetch<AdminInvestmentRecord>(getAdminSetInvestmentFiguresUrl(userId),
   {
     ...options,
-    method: 'POST',
+    method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(investmentSettingsInput)
+    body: JSON.stringify(adminSetInvestmentFiguresInput)
   }
 );}
 
@@ -1602,11 +1459,11 @@ export const adminUpdateInvestmentSettings = async (userId: string,
 
 
 
-export const getAdminUpdateInvestmentSettingsMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminUpdateInvestmentSettings>>, TError,{userId: string;data: BodyType<InvestmentSettingsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof adminUpdateInvestmentSettings>>, TError,{userId: string;data: BodyType<InvestmentSettingsInput>}, TContext> => {
+export const getAdminSetInvestmentFiguresMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminSetInvestmentFigures>>, TError,{userId: string;data: BodyType<AdminSetInvestmentFiguresInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof adminSetInvestmentFigures>>, TError,{userId: string;data: BodyType<AdminSetInvestmentFiguresInput>}, TContext> => {
 
-const mutationKey = ['adminUpdateInvestmentSettings'];
+const mutationKey = ['adminSetInvestmentFigures'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -1616,10 +1473,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof adminUpdateInvestmentSettings>>, {userId: string;data: BodyType<InvestmentSettingsInput>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof adminSetInvestmentFigures>>, {userId: string;data: BodyType<AdminSetInvestmentFiguresInput>}> = (props) => {
           const {userId,data} = props ?? {};
 
-          return  adminUpdateInvestmentSettings(userId,data,requestOptions)
+          return  adminSetInvestmentFigures(userId,data,requestOptions)
         }
 
 
@@ -1629,22 +1486,22 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type AdminUpdateInvestmentSettingsMutationResult = NonNullable<Awaited<ReturnType<typeof adminUpdateInvestmentSettings>>>
-    export type AdminUpdateInvestmentSettingsMutationBody = BodyType<InvestmentSettingsInput>
-    export type AdminUpdateInvestmentSettingsMutationError = ErrorType<unknown>
+    export type AdminSetInvestmentFiguresMutationResult = NonNullable<Awaited<ReturnType<typeof adminSetInvestmentFigures>>>
+    export type AdminSetInvestmentFiguresMutationBody = BodyType<AdminSetInvestmentFiguresInput>
+    export type AdminSetInvestmentFiguresMutationError = ErrorType<unknown>
 
     /**
- * @summary Update a user's simulated investment settings
+ * @summary Set a user's admin-reported investment figures
  */
-export const useAdminUpdateInvestmentSettings = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminUpdateInvestmentSettings>>, TError,{userId: string;data: BodyType<InvestmentSettingsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+export const useAdminSetInvestmentFigures = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminSetInvestmentFigures>>, TError,{userId: string;data: BodyType<AdminSetInvestmentFiguresInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
-        Awaited<ReturnType<typeof adminUpdateInvestmentSettings>>,
+        Awaited<ReturnType<typeof adminSetInvestmentFigures>>,
         TError,
-        {userId: string;data: BodyType<InvestmentSettingsInput>},
+        {userId: string;data: BodyType<AdminSetInvestmentFiguresInput>},
         TContext
       > => {
-      return useMutation(getAdminUpdateInvestmentSettingsMutationOptions(options));
+      return useMutation(getAdminSetInvestmentFiguresMutationOptions(options));
     }
 
 export const getAssignDepositAddressUrl = (id: number,) => {
@@ -2323,7 +2180,7 @@ export const getGetCopyTradingUrl = () => {
 }
 
 /**
- * @summary Get demo copy-trading trader and allocation
+ * @summary Get admin-reported copy-trading trader and allocation
  */
 export const getCopyTrading = async ( options?: Parameters<typeof customFetch>[1]): Promise<CopyTrading> => {
 
@@ -2370,7 +2227,7 @@ export type GetCopyTradingQueryError = ErrorType<unknown>
 
 
 /**
- * @summary Get demo copy-trading trader and allocation
+ * @summary Get admin-reported copy-trading trader and allocation
  */
 
 export function useGetCopyTrading<TData = Awaited<ReturnType<typeof getCopyTrading>>, TError = ErrorType<unknown>>(
@@ -2400,7 +2257,7 @@ export const getCreateCopyAllocationUrl = () => {
 }
 
 /**
- * @summary Set a simulated copy-trading allocation
+ * @summary Set a copy-trading allocation
  */
 export const createCopyAllocation = async (copyAllocationInput: CopyAllocationInput, options?: Parameters<typeof customFetch>[1]): Promise<CopyTrading> => {
 
@@ -2449,7 +2306,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type CreateCopyAllocationMutationError = ErrorType<unknown>
 
     /**
- * @summary Set a simulated copy-trading allocation
+ * @summary Set a copy-trading allocation
  */
 export const useCreateCopyAllocation = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCopyAllocation>>, TError,{data: BodyType<CopyAllocationInput>}, TContext>, request?: SecondParameter<typeof customFetch>}

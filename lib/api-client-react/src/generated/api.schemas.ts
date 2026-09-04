@@ -259,10 +259,17 @@ export type CopyTradingTrader = {
   performance: number[];
 };
 
+export type CopyTradingReportingMode = typeof CopyTradingReportingMode[keyof typeof CopyTradingReportingMode];
+
+
+export const CopyTradingReportingMode = {
+  admin_reported: 'admin_reported',
+} as const;
+
 export interface CopyTrading {
   trader: CopyTradingTrader;
   allocation: number;
-  isSimulated: boolean;
+  reportingMode: CopyTradingReportingMode;
 }
 
 export interface CopyAllocationInput {
@@ -277,15 +284,24 @@ export interface InvestmentEarning {
   portfolioValue: number;
 }
 
+export type InvestmentRecordReportingMode = typeof InvestmentRecordReportingMode[keyof typeof InvestmentRecordReportingMode];
+
+
+export const InvestmentRecordReportingMode = {
+  admin_reported: 'admin_reported',
+} as const;
+
 export interface InvestmentRecord {
   investmentAmount: number;
   dailyReturnPercentage: number;
-  dailySimulatedProfit: number;
-  totalAccumulatedSimulatedProfit: number;
-  currentSimulatedPortfolioValue: number;
+  dailyProfit: number;
+  totalAccumulatedProfit: number;
+  currentPortfolioValue: number;
   /** @nullable */
   investmentStartDate: string | null;
   compoundingEnabled: boolean;
+  reportingMode: InvestmentRecordReportingMode;
+  isWithdrawable: boolean;
   earningsHistory: InvestmentEarning[];
 }
 
@@ -293,14 +309,14 @@ export type AdminInvestmentRecord = InvestmentRecord & {
   userId: string;
 };
 
-export interface InvestmentInput {
-  /** @minimum 1 */
-  amount: number;
-  compoundingEnabled: boolean;
-}
-
-export interface InvestmentSettingsInput {
-  compoundingEnabled: boolean;
+export interface AdminSetInvestmentFiguresInput {
+  /** @minimum 0 */
+  investmentAmount: number;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  dailyReturnPercentage: number;
 }
 
 export interface Faq {

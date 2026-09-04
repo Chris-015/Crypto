@@ -39,16 +39,12 @@ import {
   CreateCopyAllocationBody,
   CreateCopyAllocationResponse,
   GetInvestmentResponse,
-  CreateInvestmentBody,
-  CreateInvestmentResponse,
-  UpdateInvestmentSettingsBody,
-  UpdateInvestmentSettingsResponse,
   GetAdminInvestmentsResponse,
   AdminAccrueInvestmentParams,
   AdminAccrueInvestmentResponse,
-  AdminUpdateInvestmentSettingsParams,
-  AdminUpdateInvestmentSettingsBody,
-  AdminUpdateInvestmentSettingsResponse,
+  AdminSetInvestmentFiguresParams,
+  AdminSetInvestmentFiguresBody,
+  AdminSetInvestmentFiguresResponse,
   UpdateWithdrawalStatusBody,
   UpdateWithdrawalStatusParams,
   UpdateWithdrawalStatusResponse,
@@ -132,8 +128,8 @@ type InvestmentRecord = {
   compoundingEnabled: boolean;
   investmentStartDate: Date | null;
   lastAccruedDate: string | null;
-  totalAccumulatedSimulatedProfit: number;
-  currentSimulatedPortfolioValue: number;
+  totalAccumulatedProfit: number;
+  currentPortfolioValue: number;
   earningsHistory: InvestmentEarning[];
 };
 
@@ -272,11 +268,11 @@ const investmentRecords: InvestmentRecord[] = [
     userId: "demo-user",
     investmentAmount: 5000,
     dailyReturnPercentage: 3,
-    compoundingEnabled: false,
+    compoundingEnabled: true,
     investmentStartDate: new Date("2026-08-25T00:00:00Z"),
     lastAccruedDate: "2026-08-25",
-    totalAccumulatedSimulatedProfit: 0,
-    currentSimulatedPortfolioValue: 5000,
+    totalAccumulatedProfit: 0,
+    currentPortfolioValue: 5000,
     earningsHistory: [],
   },
 ];
@@ -363,11 +359,11 @@ const ensureInvestment = (userId: string) => {
     userId,
     investmentAmount: 0,
     dailyReturnPercentage: 3,
-    compoundingEnabled: false,
+    compoundingEnabled: true,
     investmentStartDate: null,
     lastAccruedDate: null,
-    totalAccumulatedSimulatedProfit: 0,
-    currentSimulatedPortfolioValue: 0,
+    totalAccumulatedProfit: 0,
+    currentPortfolioValue: 0,
     earningsHistory: [],
   };
   investmentRecords.push(blank);
@@ -380,16 +376,16 @@ const accrueInvestment = (record: InvestmentRecord) => {
   let earningDate = nextDateKey(record.lastAccruedDate ?? dateKey(record.investmentStartDate));
   while (earningDate <= today) {
     const baseAmount = record.compoundingEnabled
-      ? record.currentSimulatedPortfolioValue
+      ? record.currentPortfolioValue
       : record.investmentAmount;
     const profit = money(baseAmount * (record.dailyReturnPercentage / 100));
-    record.currentSimulatedPortfolioValue = money(record.currentSimulatedPortfolioValue + profit);
-    record.totalAccumulatedSimulatedProfit = money(record.totalAccumulatedSimulatedProfit + profit);
+    record.currentPortfolioValue = money(record.currentPortfolioValue + profit);
+    record.totalAccumulatedProfit = money(record.totalAccumulatedProfit + profit);
     record.earningsHistory.push({
       date: new Date(`${earningDate}T00:00:00.000Z`),
       baseAmount: money(baseAmount),
       profit,
-      portfolioValue: record.currentSimulatedPortfolioValue,
+      portfolioValue: record.currentPortfolioValue,
     });
     record.lastAccruedDate = earningDate;
     earningDate = nextDateKey(earningDate);
@@ -399,16 +395,18 @@ const accrueInvestment = (record: InvestmentRecord) => {
 const publicInvestment = (record: InvestmentRecord) => ({
   investmentAmount: record.investmentAmount,
   dailyReturnPercentage: record.dailyReturnPercentage,
-  dailySimulatedProfit: money(
+  dailyProfit: money(
     (record.compoundingEnabled
-      ? record.currentSimulatedPortfolioValue
+      ? record.currentPortfolioValue
       : record.investmentAmount) *
       (record.dailyReturnPercentage / 100),
   ),
-  totalAccumulatedSimulatedProfit: record.totalAccumulatedSimulatedProfit,
-  currentSimulatedPortfolioValue: record.currentSimulatedPortfolioValue,
+  totalAccumulatedProfit: record.totalAccumulatedProfit,
+  currentPortfolioValue: record.currentPortfolioValue,
   investmentStartDate: record.investmentStartDate,
   compoundingEnabled: record.compoundingEnabled,
+  reportingMode: "admin_reported" as const,
+  isWithdrawable: false,
   earningsHistory: record.earningsHistory,
 });
 
@@ -489,41 +487,6 @@ router.get("/investment", (req, res) => {
   const record = ensureInvestment(userIdFor(req));
   accrueInvestment(record);
   res.json(GetInvestmentResponse.parse(publicInvestment(record)));
-});
-
-router.post("/investment", (req, res) => {
-  const parsed = CreateInvestmentBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.message });
-    return;
-  }
-  const record = ensureInvestment(userIdFor(req));
-  if (record.investmentAmount > 0) {
-    res.status(409).json({ error: "An investment has already been started for this account" });
-    return;
-  }
-  record.investmentAmount = money(parsed.data.amount);
-  record.currentSimulatedPortfolioValue = record.investmentAmount;
-  record.compoundingEnabled = parsed.data.compoundingEnabled;
-  record.investmentStartDate = now();
-  record.lastAccruedDate = dateKey(record.investmentStartDate);
-  res.status(201).json(CreateInvestmentResponse.parse(publicInvestment(record)));
-});
-
-router.post("/investment/settings", (req, res) => {
-  const parsed = UpdateInvestmentSettingsBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.message });
-    return;
-  }
-  const record = ensureInvestment(userIdFor(req));
-  if (record.investmentAmount <= 0) {
-    res.status(400).json({ error: "Start an investment before changing its settings" });
-    return;
-  }
-  accrueInvestment(record);
-  record.compoundingEnabled = parsed.data.compoundingEnabled;
-  res.json(UpdateInvestmentSettingsResponse.parse(publicInvestment(record)));
 });
 
 router.get("/transactions", (_req, res) => {
@@ -667,7 +630,7 @@ router.get("/copy-trading", (_req, res) => {
     GetCopyTradingResponse.parse({
       trader: copyTrader,
       allocation: copyAllocation,
-      isSimulated: true,
+      reportingMode: "admin_reported",
     }),
   );
 });
@@ -683,7 +646,7 @@ router.post("/copy-trading", (req, res) => {
     CreateCopyAllocationResponse.parse({
       trader: copyTrader,
       allocation: copyAllocation,
-      isSimulated: true,
+      reportingMode: "admin_reported",
     }),
   );
 });
@@ -777,34 +740,50 @@ router.post("/admin/investments/:userId/accrue", (req, res) => {
   accrueInvestment(record);
   if (record.earningsHistory.length > previousEarnings) {
     addAuditLog(
-      "Daily simulated earning accrued",
-      publicInvestment(record).dailySimulatedProfit,
-      `Recorded a non-withdrawable ${record.dailyReturnPercentage}% simulated earning for ${record.userId}`,
+      "Daily admin-reported earning accrued",
+      publicInvestment(record).dailyProfit,
+      `Recorded a non-withdrawable ${record.dailyReturnPercentage}% admin-reported earning for ${record.userId}`,
     );
   }
   res.json(AdminAccrueInvestmentResponse.parse(adminInvestment(record)));
 });
 
-router.post("/admin/investments/:userId/settings", (req, res) => {
-  const params = AdminUpdateInvestmentSettingsParams.safeParse(req.params);
-  const parsed = AdminUpdateInvestmentSettingsBody.safeParse(req.body);
+router.put("/admin/investments/:userId", (req, res) => {
+  const params = AdminSetInvestmentFiguresParams.safeParse(req.params);
+  const parsed = AdminSetInvestmentFiguresBody.safeParse(req.body);
   if (!params.success || !parsed.success) {
-    res.status(400).json({ error: "Invalid investment settings" });
+    res.status(400).json({ error: "Invalid investment figures" });
     return;
   }
-  const record = investmentRecords.find((item) => item.userId === params.data.userId);
-  if (!record) {
-    res.status(404).json({ error: "Investment record not found" });
-    return;
+  const record = ensureInvestment(params.data.userId);
+  const previousAmount = record.investmentAmount;
+  if (previousAmount > 0) {
+    accrueInvestment(record);
   }
-  accrueInvestment(record);
-  record.compoundingEnabled = parsed.data.compoundingEnabled;
+  const nextAmount = money(parsed.data.investmentAmount);
+  const amountChanged = previousAmount !== nextAmount;
+  record.investmentAmount = nextAmount;
+  record.dailyReturnPercentage = parsed.data.dailyReturnPercentage;
+  record.compoundingEnabled = true;
+  if (record.investmentAmount <= 0) {
+    record.investmentStartDate = null;
+    record.lastAccruedDate = null;
+    record.currentPortfolioValue = 0;
+    record.totalAccumulatedProfit = 0;
+    record.earningsHistory = [];
+  } else if (amountChanged) {
+    record.investmentStartDate = now();
+    record.lastAccruedDate = dateKey(record.investmentStartDate);
+    record.currentPortfolioValue = record.investmentAmount;
+    record.totalAccumulatedProfit = 0;
+    record.earningsHistory = [];
+  }
   addAuditLog(
-    "Investment compounding setting updated",
+    "Admin-reported investment figures updated",
     record.investmentAmount,
-    `${record.userId} compounding ${record.compoundingEnabled ? "enabled" : "disabled"}`,
+    `${record.userId}: ${record.investmentAmount} USDT at ${record.dailyReturnPercentage}% daily compounding`,
   );
-  res.json(AdminUpdateInvestmentSettingsResponse.parse(adminInvestment(record)));
+  res.json(AdminSetInvestmentFiguresResponse.parse(adminInvestment(record)));
 });
 
 router.post("/admin/deposits/:id/address", (req, res) => {

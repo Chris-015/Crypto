@@ -5,10 +5,11 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { CopyTradingReportingMode } from './copyTradingReportingMode';
 import type { CopyTradingTrader } from './copyTradingTrader';
 
 export interface CopyTrading {
   trader: CopyTradingTrader;
   allocation: number;
-  isSimulated: boolean;
+  reportingMode: CopyTradingReportingMode;
 }

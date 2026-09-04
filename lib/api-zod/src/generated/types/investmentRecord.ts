@@ -6,15 +6,18 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { InvestmentEarning } from './investmentEarning';
+import type { InvestmentRecordReportingMode } from './investmentRecordReportingMode';
 
 export interface InvestmentRecord {
   investmentAmount: number;
   dailyReturnPercentage: number;
-  dailySimulatedProfit: number;
-  totalAccumulatedSimulatedProfit: number;
-  currentSimulatedPortfolioValue: number;
+  dailyProfit: number;
+  totalAccumulatedProfit: number;
+  currentPortfolioValue: number;
   /** @nullable */
   investmentStartDate: Date | null;
   compoundingEnabled: boolean;
+  reportingMode: InvestmentRecordReportingMode;
+  isWithdrawable: boolean;
   earningsHistory: InvestmentEarning[];
 }
