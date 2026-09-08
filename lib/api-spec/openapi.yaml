@@ -585,7 +585,7 @@ components:
       type: object
       required: [amount]
       properties:
-        amount: { type: number, minimum: 500, maximum: 50000 }
+        amount: { type: number, minimum: 500, maximum: 100000 }
     DepositAddressInput:
       type: object
       required: [address]

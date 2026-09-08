@@ -109,7 +109,7 @@ export const GetDepositsResponse = zod.array(GetDepositsResponseItem)
  * @summary Create a deposit request
  */
 export const createDepositBodyAmountMin = 500;
-export const createDepositBodyAmountMax = 50000;
+export const createDepositBodyAmountMax = 100000;
 
 
 

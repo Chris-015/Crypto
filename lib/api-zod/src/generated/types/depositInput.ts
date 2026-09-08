@@ -9,7 +9,7 @@
 export interface DepositInput {
   /**
      * @minimum 500
-     * @maximum 50000
+     * @maximum 100000
      */
   amount: number;
 }
