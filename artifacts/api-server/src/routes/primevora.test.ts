@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
 import { after, before, test } from "node:test";
 import express from "express";
+import { build } from "esbuild";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import primevoraRouter, {
   setPrimevoraAdminAuthResolverForTests,
   setPrimevoraUserIdResolverForTests,
@@ -360,4 +365,157 @@ test("referral claims work before account activity and fail after activity begin
   });
   assert.equal(claim.status, 409);
   assert.match(claim.body.error, /before the first account transaction/i);
+});
+
+test("financial records survive a separately bundled process", async () => {
+  const suffix = process.hrtime.bigint().toString();
+  const referrerUserId = `restart-referrer-${suffix}`;
+  const depositUserId = `restart-deposit-${suffix}`;
+  const withdrawalUserId = `restart-withdrawal-${suffix}`;
+  const referrer = await request<{ code: string }>("/referrals", { userId: referrerUserId });
+  assert.equal((await request("/referrals/claim", { userId: depositUserId, body: { code: referrer.body.code } })).status, 200);
+  const correctedDeposit = await prepareDeposit(depositUserId, 500);
+  assert.equal((await updateDeposit(correctedDeposit, "completed")).status, 200);
+  assert.equal((await reverseDeposit(correctedDeposit, "Restart persistence correction")).status, 200);
+  const withdrawalDeposit = await prepareDeposit(withdrawalUserId, 500);
+  assert.equal((await updateDeposit(withdrawalDeposit, "completed")).status, 200);
+  assert.equal((await request("/withdrawals", {
+    userId: withdrawalUserId,
+    body: { amount: 100, address: "TRestartReservationAddress123456" },
+  })).status, 201);
+
+  const outputDir = await mkdtemp(path.join(tmpdir(), "primevora-persistence-"));
+  const childFile = path.join(outputDir, "child.cjs");
+  try {
+    await build({
+      entryPoints: [path.join(process.cwd(), "src/routes/primevora.persistence-child.ts")],
+      bundle: true, format: "cjs", platform: "node", outfile: childFile, logLevel: "silent",
+    });
+    const childOutput = new Promise<string>((resolve, reject) => {
+      const child = spawn(process.execPath, [childFile, depositUserId, referrerUserId, withdrawalUserId], {
+        env: { ...process.env, NODE_ENV: "test" },
+      });
+      let result = "";
+      child.stdout.on("data", (chunk) => { result += chunk; });
+      child.once("error", reject);
+      child.once("exit", (code) => code === 0 ? resolve(result) : reject(new Error(`Child process exited ${code}`)));
+    });
+    const startupWriteUser = `startup-write-${suffix}`;
+    const [stdout, startupDepositId] = await Promise.all([
+      childOutput,
+      createDeposit(startupWriteUser, 500),
+    ]);
+    assert.ok(startupDepositId >= 1_000_000);
+    assert.ok((await request<Array<{ id: number }>>("/deposits", { userId: startupWriteUser }))
+      .body.some((deposit) => deposit.id === startupDepositId));
+    const result = JSON.parse(stdout) as {
+      deposits: Array<{ id: number; correction: unknown }>;
+      depositDashboard: { balance: number };
+      referrals: { earned: number; history: Array<{ correction: unknown }> };
+      withdrawals: Array<{ amount: number; status: string }>;
+      withdrawalDashboard: { balance: number };
+    };
+    assert.ok(result.deposits.some((deposit) => deposit.id === correctedDeposit && deposit.correction));
+    assert.equal(result.depositDashboard.balance, 0);
+    assert.ok(result.referrals.history.some((reward) => reward.correction));
+    assert.ok(result.withdrawals.some((withdrawal) => withdrawal.amount === 100 && withdrawal.status === "pending_review"));
+    assert.equal(result.withdrawalDashboard.balance, 400);
+  } finally {
+    await rm(outputDir, { recursive: true, force: true });
+  }
+});
+
+test("concurrent withdrawal reservations cannot overspend a persisted balance", async () => {
+  const userId = `concurrent-withdrawal-${process.hrtime.bigint()}`;
+  const depositId = await prepareDeposit(userId, 500);
+  assert.equal((await updateDeposit(depositId, "completed")).status, 200);
+
+  const [first, second] = await Promise.all([
+    request<{ id?: number; error?: string }>("/withdrawals", {
+      userId,
+      body: { amount: 375, address: "TConcurrentWithdrawalAddress123456" },
+    }),
+    request<{ id?: number; error?: string }>("/withdrawals", {
+      userId,
+      body: { amount: 375, address: "TConcurrentWithdrawalAddress123456" },
+    }),
+  ]);
+  assert.deepEqual([first.status, second.status].sort(), [201, 409]);
+  const dashboard = await request<{ balance: number }>("/dashboard", { userId });
+  assert.equal(dashboard.body.balance, 125);
+  const withdrawals = await request<Array<{ amount: number }>>("/withdrawals", { userId });
+  assert.equal(withdrawals.body.filter((withdrawal) => withdrawal.amount === 375).length, 1);
+});
+
+test("approval racing a reversal cannot leave an uncorrected referral credit", async () => {
+  const userId = `approval-reversal-race-${process.hrtime.bigint()}`;
+  const referrerUserId = `approval-reversal-referrer-${process.hrtime.bigint()}`;
+  const referrer = await request<{ code: string; earned: number }>("/referrals", { userId: referrerUserId });
+  assert.equal((await request("/referrals/claim", { userId, body: { code: referrer.body.code } })).status, 200);
+  const before = await request<{ earned: number }>("/referrals", { userId: referrerUserId });
+  const depositId = await prepareDeposit(userId, 500);
+  const [racingApproval, racingReverse] = await Promise.all([
+    updateDeposit(depositId, "completed"),
+    reverseDeposit(depositId, "Race-safe correction of approved transfer"),
+  ]);
+  // If reversal read the pre-approval state, retry once after the racing
+  // approval settles.  The durable final state must still compensate reward.
+  // The winner can legitimately observe the other operation's pre-terminal
+  // state. Settle any loser, then assert the durable result of the race.
+  const raced = (await request<Array<{ id: number; status: string; correction: unknown }>>("/admin/deposits"))
+    .body.find((candidate) => candidate.id === depositId);
+  if (raced?.status !== "completed") assert.equal((await updateDeposit(depositId, "completed")).status, 200);
+  const settled = (await request<Array<{ id: number; correction: unknown }>>("/admin/deposits"))
+    .body.find((candidate) => candidate.id === depositId);
+  if (!settled?.correction) {
+    const correction = await reverseDeposit(depositId, "Race-safe correction of approved transfer");
+    assert.ok(correction.status === 200 || correction.status === 409, `unexpected race result: ${racingApproval.status}/${racingReverse.status}`);
+  }
+  assert.equal((await request<{ balance: number }>("/dashboard", { userId })).body.balance, 0);
+  const after = await request<{ earned: number }>("/referrals", { userId: referrerUserId });
+  assert.equal(after.body.earned, before.body.earned);
+  const deposit = (await request<Array<{ id: number; correction: unknown }>>("/admin/deposits"))
+    .body.find((candidate) => candidate.id === depositId);
+  assert.ok(deposit?.correction);
+});
+
+test("withdrawal racing reversal cannot create a corrected negative balance", async () => {
+  const userId = `withdrawal-reversal-depositor-${process.hrtime.bigint()}`;
+  const depositId = await prepareDeposit(userId, 500);
+  assert.equal((await updateDeposit(depositId, "completed")).status, 200);
+  const [withdrawal, reversal] = await Promise.all([
+    request("/withdrawals", {
+      userId,
+      body: { amount: 400, address: "TWithdrawalReversalRaceAddress1234" },
+    }),
+    reverseDeposit(depositId, "Withdrawal reversal serialization race"),
+  ]);
+  const dashboard = await request<{ balance: number }>("/dashboard", { userId });
+  assert.ok(dashboard.body.balance >= 0);
+  if (reversal.status === 200) {
+    assert.equal(withdrawal.status, 409);
+    assert.equal(dashboard.body.balance, 0);
+  } else {
+    assert.equal(withdrawal.status, 201);
+    assert.equal(reversal.status, 409);
+    assert.equal(dashboard.body.balance, 100);
+  }
+});
+
+test("deposit address assignment racing approval never reverts completion", async () => {
+  const userId = `address-approval-race-${process.hrtime.bigint()}`;
+  const depositId = await createDeposit(userId, 500);
+  const [assignment, approval] = await Promise.all([
+    request(`/admin/deposits/${depositId}/address`, {
+      body: { address: "TAddressApprovalRaceAddress123456" },
+    }),
+    updateDeposit(depositId, "completed"),
+  ]);
+  assert.ok([200, 409].includes(approval.status));
+  assert.ok([200, 409].includes(assignment.status));
+  const stored = (await request<Array<{ id: number; status: string }>>("/admin/deposits"))
+    .body.find((deposit) => deposit.id === depositId);
+  assert.ok(stored);
+  if (approval.status === 200) assert.equal(stored.status, "completed");
+  assert.notEqual(stored.status, "awaiting_address");
 });

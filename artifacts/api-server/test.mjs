@@ -15,6 +15,7 @@ try {
     bundle: true,
     format: "cjs",
     platform: "node",
+    external: ["esbuild"],
     outfile: outputFile,
     sourcemap: "inline",
     logLevel: "warning",

@@ -1,5 +1,6 @@
 import { Router, type IRouter, type Request, type RequestHandler } from "express";
 import { getAuth } from "@clerk/express";
+import { pool } from "@workspace/db";
 import {
   AssignDepositAddressBody,
   AssignDepositAddressParams,
@@ -182,7 +183,7 @@ type DepositCorrection = {
 
 const now = () => new Date();
 
-const transactions: Transaction[] = [
+let transactions: Transaction[] = [
   {
     id: "TX-24810",
     type: "deposit",
@@ -221,7 +222,7 @@ const transactions: Transaction[] = [
   },
 ];
 
-const deposits: DepositRequest[] = [
+let deposits: DepositRequest[] = [
   {
     id: 24792,
     amount: 650,
@@ -269,7 +270,7 @@ const deposits: DepositRequest[] = [
   },
 ];
 
-const referralAttributions: ReferralAttribution[] = [
+let referralAttributions: ReferralAttribution[] = [
   {
     referrerUserId: "demo-user",
     referredUserId: "referred-user-1",
@@ -284,7 +285,7 @@ const referralAttributions: ReferralAttribution[] = [
   },
 ];
 
-const referralRewards: ReferralReward[] = [
+let referralRewards: ReferralReward[] = [
   {
     id: "REF-24792",
     referrerUserId: "demo-user",
@@ -307,7 +308,7 @@ const referralRewards: ReferralReward[] = [
   },
 ];
 
-const withdrawals: WithdrawalRequest[] = [
+let withdrawals: WithdrawalRequest[] = [
   {
     id: 24760,
     amount: 400,
@@ -411,13 +412,86 @@ const auditLogs: AuditLog[] = [
     reference: "AUD-77794",
   },
 ];
-const depositCorrections: DepositCorrection[] = [];
+let depositCorrections: DepositCorrection[] = [];
 
 let nextDepositId = 24837;
 let nextWithdrawalId = 24761;
 let nextTicketId = 1043;
 let nextAuditId = 3;
 const referralCodes = new Map<string, string>([["PRIME-8841", "demo-user"]]);
+
+/*
+ * The database migration owns these relations.  This module deliberately only
+ * performs DML: deployments apply schema changes through Drizzle's publish
+ * flow, never while serving a request.
+ */
+let financialSeeded = false;
+const demoFinancialRecords = {
+  transactions: transactions.map((item) => ({ ...item })),
+  deposits: deposits.map((item) => ({ ...item })),
+  withdrawals: withdrawals.map((item) => ({ ...item })),
+  attributions: referralAttributions.map((item) => ({ ...item })),
+  rewards: referralRewards.map((item) => ({ ...item })),
+};
+
+const dbNumber = (value: unknown) => Number(value);
+const seedFinancialRecords = async () => {
+  if (financialSeeded) return;
+  for (const item of demoFinancialRecords.deposits) {
+    await pool.query(
+      `insert into primevora_deposits (id, user_id, amount, status, network, address, created_at)
+       values ($1,$2,$3,$4,$5,$6,$7) on conflict (id) do nothing`,
+      [item.id, item.userId, item.amount, item.status, item.network, item.address, item.createdAt],
+    );
+  }
+  for (const item of demoFinancialRecords.withdrawals) {
+    await pool.query(
+      `insert into primevora_withdrawals (id, user_id, amount, address, status, network, created_at)
+       values ($1,$2,$3,$4,$5,$6,$7) on conflict (id) do nothing`,
+      [item.id, item.userId, item.amount, item.address, item.status, item.network, item.createdAt],
+    );
+  }
+  for (const item of demoFinancialRecords.transactions) {
+    await pool.query(
+      `insert into primevora_transactions (id, user_id, type, amount, status, reference, created_at)
+       values ($1,$2,$3,$4,$5,$6,$7) on conflict (id) do nothing`,
+      [item.id, item.userId, item.type, item.amount, item.status, item.reference, item.createdAt],
+    );
+  }
+  for (const item of demoFinancialRecords.attributions) {
+    await pool.query(
+      `insert into primevora_referral_attributions (referred_user_id, referrer_user_id, email, joined_at)
+       values ($1,$2,$3,$4) on conflict (referred_user_id) do nothing`,
+      [item.referredUserId, item.referrerUserId, item.email, item.joinedAt],
+    );
+  }
+  for (const item of demoFinancialRecords.rewards) {
+    await pool.query(
+      `insert into primevora_referral_rewards (id, referrer_user_id, referred_user_id, deposit_id, deposit_amount, reward_rate, reward, approved_at)
+       values ($1,$2,$3,$4,$5,$6,$7,$8) on conflict (deposit_id) do nothing`,
+      [item.id, item.referrerUserId, item.referredUserId, item.depositId, item.depositAmount, item.rewardRate, item.reward, item.approvedAt],
+    );
+  }
+  financialSeeded = true;
+};
+
+const refreshFinancialRecords = async () => {
+  await seedFinancialRecords();
+  const [transactionRows, depositRows, withdrawalRows, attributionRows, rewardRows, correctionRows] = await Promise.all([
+    pool.query(`select id, user_id, type, amount, status, reference, created_at from primevora_transactions order by created_at desc`),
+    pool.query(`select id, user_id, amount, status, network, address, created_at from primevora_deposits order by created_at desc`),
+    pool.query(`select id, user_id, amount, address, status, network, created_at from primevora_withdrawals order by created_at desc`),
+    pool.query(`select referred_user_id, referrer_user_id, email, joined_at from primevora_referral_attributions`),
+    pool.query(`select id, referrer_user_id, referred_user_id, deposit_id, deposit_amount, reward_rate, reward, approved_at from primevora_referral_rewards order by approved_at desc`),
+    pool.query(`select id, deposit_id, user_id, reason, deposit_amount, referral_reward_amount, corrected_at from primevora_deposit_corrections`),
+  ]);
+  transactions = transactionRows.rows.map((row): Transaction => ({ id: row.id, userId: row.user_id, type: row.type, amount: dbNumber(row.amount), status: row.status, reference: row.reference, createdAt: row.created_at }));
+  deposits = depositRows.rows.map((row): DepositRequest => ({ id: dbNumber(row.id), userId: row.user_id, amount: dbNumber(row.amount), status: row.status, network: row.network, address: row.address, createdAt: row.created_at }));
+  withdrawals = withdrawalRows.rows.map((row): WithdrawalRequest => ({ id: dbNumber(row.id), userId: row.user_id, amount: dbNumber(row.amount), address: row.address, status: row.status, network: row.network, createdAt: row.created_at }));
+  referralAttributions = attributionRows.rows.map((row): ReferralAttribution => ({ referredUserId: row.referred_user_id, referrerUserId: row.referrer_user_id, email: row.email, joinedAt: row.joined_at }));
+  referralRewards = rewardRows.rows.map((row): ReferralReward => ({ id: row.id, referrerUserId: row.referrer_user_id, referredUserId: row.referred_user_id, depositId: dbNumber(row.deposit_id), depositAmount: dbNumber(row.deposit_amount), rewardRate: dbNumber(row.reward_rate), reward: dbNumber(row.reward), approvedAt: row.approved_at }));
+  depositCorrections = correctionRows.rows.map((row): DepositCorrection => ({ id: row.id, depositId: dbNumber(row.deposit_id), userId: row.user_id, reason: row.reason, depositAmount: dbNumber(row.deposit_amount), referralRewardAmount: dbNumber(row.referral_reward_amount), correctedAt: row.corrected_at }));
+};
 
 const faqs = [
   {
@@ -741,7 +815,8 @@ router.get("/market", async (req, res): Promise<void> => {
   }
 });
 
-router.get("/dashboard", (req, res) => {
+router.get("/dashboard", async (req, res) => {
+  await refreshFinancialRecords();
   const userId = userIdFor(req);
   const userTransactions = transactions.filter((item) => item.userId === userId);
   const data = {
@@ -763,44 +838,46 @@ router.get("/dashboard", (req, res) => {
   res.json(GetDashboardResponse.parse(data));
 });
 
-router.get("/investment", (req, res) => {
+router.get("/investment", async (req, res) => {
+  await refreshFinancialRecords();
   const record = ensureInvestment(userIdFor(req));
   syncInvestmentToApprovedDeposit(record);
   accrueInvestment(record);
   res.json(GetInvestmentResponse.parse(publicInvestment(record)));
 });
 
-router.get("/transactions", (req, res) => {
+router.get("/transactions", async (req, res) => {
+  await refreshFinancialRecords();
   const userId = userIdFor(req);
   res.json(GetTransactionsResponse.parse(transactions.filter((item) => item.userId === userId)));
 });
 
-router.get("/deposits", (req, res) => {
+router.get("/deposits", async (req, res) => {
+  await refreshFinancialRecords();
   const userId = userIdFor(req);
   res.json(GetDepositsResponse.parse(deposits.filter((item) => item.userId === userId).map(publicDeposit)));
 });
 
-router.post("/deposits", (req, res) => {
+router.post("/deposits", async (req, res) => {
   const parsed = CreateDepositBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
   const userId = userIdFor(req);
-  const item: DepositRequest = {
-    id: nextDepositId++,
-    amount: parsed.data.amount,
-    status: "awaiting_address",
-    network: "TRC20",
-    address: null,
-    createdAt: now(),
-    userId,
-  };
-  deposits.unshift(item);
+  await seedFinancialRecords();
+  const createdAt = now();
+  const inserted = await pool.query(
+    `insert into primevora_deposits (user_id, amount, status, network, address, created_at)
+     values ($1,$2,'awaiting_address','TRC20',null,$3) returning id`,
+    [userId, parsed.data.amount, createdAt],
+  );
+  const item: DepositRequest = { id: dbNumber(inserted.rows[0].id), amount: parsed.data.amount, status: "awaiting_address", network: "TRC20", address: null, createdAt, userId };
   res.status(201).json(CreateDepositResponse.parse(publicDeposit(item)));
 });
 
-router.get("/withdrawals", (req, res) => {
+router.get("/withdrawals", async (req, res) => {
+  await refreshFinancialRecords();
   const userId = userIdFor(req);
   res.json(
     GetWithdrawalsResponse.parse(
@@ -809,7 +886,7 @@ router.get("/withdrawals", (req, res) => {
   );
 });
 
-router.post("/withdrawals", (req, res) => {
+router.post("/withdrawals", async (req, res) => {
   const parsed = CreateWithdrawalBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -821,34 +898,54 @@ router.post("/withdrawals", (req, res) => {
     res.status(403).json({ error: "Withdrawals require approved KYC verification" });
     return;
   }
-  const available = withdrawableBalance(userId);
-  if (parsed.data.amount > available) {
-    res.status(409).json({ error: `Withdrawal exceeds available balance of ${available.toFixed(2)} USDT` });
-    return;
+  await seedFinancialRecords();
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    // Transaction-scoped advisory locking serializes balance reservation even
+    // when requests are handled by different API processes.
+    await client.query("select pg_advisory_xact_lock(hashtext($1))", [userId]);
+    const balance = await client.query(
+      `select coalesce((select sum(d.amount - coalesce(c.deposit_amount, 0))
+          from primevora_deposits d left join primevora_deposit_corrections c on c.deposit_id=d.id
+          where d.user_id=$1 and d.status='completed'), 0)
+       + coalesce((select sum(r.reward - coalesce(c.referral_reward_amount, 0))
+          from primevora_referral_rewards r left join primevora_deposit_corrections c on c.deposit_id=r.deposit_id
+          where r.referrer_user_id=$1), 0)
+       - coalesce((select sum(amount) from primevora_withdrawals where user_id=$1 and status <> 'rejected'), 0)
+       as available`,
+      [userId],
+    );
+    const available = money(dbNumber(balance.rows[0].available));
+    if (parsed.data.amount > available) {
+      await client.query("rollback");
+      res.status(409).json({ error: `Withdrawal exceeds available balance of ${available.toFixed(2)} USDT` });
+      return;
+    }
+    const createdAt = now();
+    const inserted = await client.query(
+      `insert into primevora_withdrawals (user_id, amount, address, status, network, created_at)
+       values ($1,$2,$3,'pending_review','TRC20',$4) returning id`,
+      [userId, parsed.data.amount, parsed.data.address, createdAt],
+    );
+    const id = dbNumber(inserted.rows[0].id);
+    await client.query(
+      `insert into primevora_transactions (id, user_id, type, amount, status, reference, withdrawal_id, created_at)
+       values ($1,$2,'withdrawal',$3,'pending',null,$4,$5)`,
+      [`TX-W-${id}`, userId, parsed.data.amount, id, createdAt],
+    );
+    await client.query("commit");
+    res.status(201).json(CreateWithdrawalResponse.parse({ id, amount: parsed.data.amount, address: parsed.data.address, status: "pending_review", network: "TRC20", createdAt }));
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    client.release();
   }
-  const item: WithdrawalRequest = {
-    id: nextWithdrawalId++,
-    amount: parsed.data.amount,
-    address: parsed.data.address,
-    status: "pending_review",
-    network: "TRC20",
-    createdAt: now(),
-    userId,
-  };
-  withdrawals.unshift(item);
-  transactions.unshift({
-    id: `TX-${item.id}`,
-    type: "withdrawal",
-    amount: item.amount,
-    status: "pending",
-    reference: null,
-    createdAt: item.createdAt,
-    userId,
-  });
-  res.status(201).json(CreateWithdrawalResponse.parse(publicWithdrawal(item)));
 });
 
-router.get("/referrals", (req, res) => {
+router.get("/referrals", async (req, res) => {
+  await refreshFinancialRecords();
   const userId = userIdFor(req);
   const code = referralCodeFor(userId);
   const attributions = referralAttributions.filter((item) => item.referrerUserId === userId);
@@ -889,7 +986,7 @@ router.get("/referrals", (req, res) => {
   );
 });
 
-router.post("/referrals/claim", (req, res) => {
+router.post("/referrals/claim", async (req, res) => {
   const parsed = ClaimReferralBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -905,6 +1002,7 @@ router.post("/referrals/claim", (req, res) => {
     res.status(409).json({ error: "Self-referrals are not eligible" });
     return;
   }
+  await refreshFinancialRecords();
   const existing = referralAttributions.find((item) => item.referredUserId === referredUserId);
   if (existing && existing.referrerUserId !== referrerUserId) {
     res.status(409).json({ error: "This account is already linked to a referrer" });
@@ -918,14 +1016,11 @@ router.post("/referrals/claim", (req, res) => {
     res.status(409).json({ error: "Referral codes must be claimed before the first account transaction" });
     return;
   }
-  if (!existing) {
-    referralAttributions.push({
-      referrerUserId,
-      referredUserId,
-      email: "Primevora member",
-      joinedAt: now(),
-    });
-  }
+  if (!existing) await pool.query(
+    `insert into primevora_referral_attributions (referred_user_id, referrer_user_id, email, joined_at)
+     values ($1,$2,'Primevora member',$3) on conflict (referred_user_id) do nothing`,
+    [referredUserId, referrerUserId, now()],
+  );
   res.json(ClaimReferralResponse.parse({ claimed: true }));
 });
 
@@ -1047,7 +1142,8 @@ router.post("/support/tickets/:id/reply", (req, res) => {
 
 router.use("/admin", requireAdmin);
 
-router.get("/admin/overview", (_req, res) => {
+router.get("/admin/overview", async (_req, res) => {
+  await refreshFinancialRecords();
   res.json(
     GetAdminOverviewResponse.parse({
       users: 248,
@@ -1060,11 +1156,13 @@ router.get("/admin/overview", (_req, res) => {
   );
 });
 
-router.get("/admin/deposits", (_req, res) => {
+router.get("/admin/deposits", async (_req, res) => {
+  await refreshFinancialRecords();
   res.json(GetAdminDepositsResponse.parse(deposits.map(publicDeposit)));
 });
 
-router.get("/admin/investments", (_req, res) => {
+router.get("/admin/investments", async (_req, res) => {
+  await refreshFinancialRecords();
   investmentRecords.forEach((record) => {
     syncInvestmentToApprovedDeposit(record);
     accrueInvestment(record);
@@ -1123,34 +1221,46 @@ router.put("/admin/investments/:userId", (req, res) => {
   res.json(AdminSetInvestmentFiguresResponse.parse(adminInvestment(record)));
 });
 
-router.post("/admin/deposits/:id/address", (req, res) => {
+router.post("/admin/deposits/:id/address", async (req, res) => {
   const params = AssignDepositAddressParams.safeParse(req.params);
   const parsed = AssignDepositAddressBody.safeParse(req.body);
   if (!params.success || !parsed.success) {
     res.status(400).json({ error: "Invalid deposit address assignment" });
     return;
   }
-  const item = deposits.find((candidate) => candidate.id === params.data.id);
-  if (!item) {
+  await seedFinancialRecords();
+  const updated = await pool.query(
+    `update primevora_deposits
+     set address=$1, status='awaiting_transfer'
+     where id=$2 and status='awaiting_address'
+     returning id,user_id,amount,status,network,address,created_at`,
+    [parsed.data.address, params.data.id],
+  );
+  if (updated.rowCount) {
+    const row = updated.rows[0];
+    const item: DepositRequest = {
+      id: dbNumber(row.id), userId: row.user_id, amount: dbNumber(row.amount),
+      status: row.status, network: row.network, address: row.address, createdAt: row.created_at,
+    };
+    res.json(AssignDepositAddressResponse.parse(publicDeposit(item)));
+    return;
+  }
+  const current = await pool.query(`select status from primevora_deposits where id=$1`, [params.data.id]);
+  if (!current.rowCount) {
     res.status(404).json({ error: "Deposit request not found" });
     return;
   }
-  if (item.status !== "awaiting_address") {
-    res.status(409).json({ error: `An ${item.status} deposit cannot receive a new address` });
-    return;
-  }
-  item.address = parsed.data.address;
-  item.status = "awaiting_transfer";
-  res.json(AssignDepositAddressResponse.parse(publicDeposit(item)));
+  res.status(409).json({ error: `An ${current.rows[0].status} deposit cannot receive a new address` });
 });
 
-router.post("/admin/deposits/:id/status", (req, res) => {
+router.post("/admin/deposits/:id/status", async (req, res) => {
   const params = UpdateDepositStatusParams.safeParse(req.params);
   const parsed = UpdateDepositStatusBody.safeParse(req.body);
   if (!params.success || !parsed.success) {
     res.status(400).json({ error: "Invalid deposit status update" });
     return;
   }
+  await refreshFinancialRecords();
   const item = deposits.find((candidate) => candidate.id === params.data.id);
   if (!item) {
     res.status(404).json({ error: "Deposit request not found" });
@@ -1168,21 +1278,85 @@ router.post("/admin/deposits/:id/status", (req, res) => {
     res.json(UpdateDepositStatusResponse.parse(publicDeposit(item)));
     return;
   }
-  item.status = parsed.data.status;
-  if (item.status === "completed") {
-    if (!transactions.some((transaction) => transaction.id === `TX-${item.id}`)) {
-      transactions.unshift({
-        id: `TX-${item.id}`,
-        type: "deposit",
-        amount: item.amount,
-        status: "completed",
-        reference: `DEPOSIT-${item.id}`,
-        createdAt: now(),
-        userId: item.userId,
-      });
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    const initial = await client.query(
+      `select d.user_id,a.referrer_user_id
+       from primevora_deposits d
+       left join primevora_referral_attributions a on a.referred_user_id=d.user_id
+       where d.id=$1`,
+      [item.id],
+    );
+    if (!initial.rowCount) {
+      await client.query("rollback");
+      res.status(404).json({ error: "Deposit request not found" });
+      return;
     }
-    awardReferralReward(item);
-  }
+    const affectedUserIds = [...new Set([
+      initial.rows[0].user_id as string,
+      ...(initial.rows[0].referrer_user_id ? [initial.rows[0].referrer_user_id as string] : []),
+    ])].sort();
+    for (const affectedUserId of affectedUserIds) {
+      await client.query("select pg_advisory_xact_lock(hashtext($1))", [affectedUserId]);
+    }
+    const locked = await client.query(
+      `select d.status,d.address,d.user_id,d.amount,a.referrer_user_id
+       from primevora_deposits d
+       left join primevora_referral_attributions a on a.referred_user_id=d.user_id
+       where d.id=$1 for update of d`,
+      [item.id],
+    );
+    if (!locked.rowCount) {
+      await client.query("rollback");
+      res.status(404).json({ error: "Deposit request not found" });
+      return;
+    }
+    const persistedStatus = locked.rows[0].status as DepositRequest["status"];
+    if (persistedStatus === "completed" || persistedStatus === "rejected") {
+      await client.query("rollback");
+      if (persistedStatus !== parsed.data.status) {
+        res.status(409).json({ error: `A ${persistedStatus} deposit cannot change status` });
+      } else {
+        item.status = persistedStatus;
+        res.json(UpdateDepositStatusResponse.parse(publicDeposit(item)));
+      }
+      return;
+    }
+    if (parsed.data.status === "completed" && !locked.rows[0].address) {
+      await client.query("rollback");
+      res.status(409).json({ error: "A receiving address must be assigned before approving the deposit" });
+      return;
+    }
+    item.userId = locked.rows[0].user_id;
+    item.amount = dbNumber(locked.rows[0].amount);
+    await client.query(`update primevora_deposits set status=$1 where id=$2`, [parsed.data.status, item.id]);
+    if (parsed.data.status === "completed") {
+      const approvedAt = now();
+      await client.query(
+        `insert into primevora_transactions (id,user_id,type,amount,status,reference,deposit_id,created_at)
+         values ($1,$2,'deposit',$3,'completed',$4,$5,$6) on conflict (id) do nothing`,
+        [`TX-${item.id}`, item.userId, item.amount, `DEPOSIT-${item.id}`, item.id, approvedAt],
+      );
+      const referrerUserId = locked.rows[0].referrer_user_id as string | null;
+      if (referrerUserId && referrerUserId !== item.userId) {
+        const rewardId = `REF-${item.id}`;
+        const reward = money(item.amount * 0.05);
+        const inserted = await client.query(
+          `insert into primevora_referral_rewards (id,referrer_user_id,referred_user_id,deposit_id,deposit_amount,reward_rate,reward,approved_at)
+           values ($1,$2,$3,$4,$5,5,$6,$7) on conflict (deposit_id) do nothing returning id`,
+          [rewardId, referrerUserId, item.userId, item.id, item.amount, reward, approvedAt],
+        );
+        if (inserted.rowCount) await client.query(
+          `insert into primevora_transactions (id,user_id,type,amount,status,reference,referral_reward_id,created_at)
+           values ($1,$2,'referral',$3,'completed',$4,$4,$5) on conflict (id) do nothing`,
+          [`TX-${rewardId}`, referrerUserId, reward, rewardId, approvedAt],
+        );
+      }
+    }
+    await client.query("commit");
+  } catch (error) { await client.query("rollback"); throw error; } finally { client.release(); }
+  item.status = parsed.data.status;
   syncInvestmentToApprovedDeposit(ensureInvestment(item.userId));
   addAuditLog(
     parsed.data.status === "completed" ? "Deposit approved" : "Deposit rejected",
@@ -1192,7 +1366,7 @@ router.post("/admin/deposits/:id/status", (req, res) => {
   res.json(UpdateDepositStatusResponse.parse(publicDeposit(item)));
 });
 
-router.post("/admin/deposits/:id/reverse", (req, res) => {
+router.post("/admin/deposits/:id/reverse", async (req, res) => {
   const params = ReverseApprovedDepositParams.safeParse(req.params);
   const parsed = ReverseApprovedDepositBody.safeParse(req.body);
   if (!params.success || !parsed.success) {
@@ -1204,89 +1378,124 @@ router.post("/admin/deposits/:id/reverse", (req, res) => {
     res.status(400).json({ error: "A correction reason of at least 10 characters is required" });
     return;
   }
-  const item = deposits.find((candidate) => candidate.id === params.data.id);
-  if (!item) {
-    res.status(404).json({ error: "Deposit request not found" });
-    return;
-  }
-  if (item.status !== "completed") {
-    res.status(409).json({ error: "Only an approved deposit can be reversed" });
-    return;
-  }
-  if (depositCorrections.some((correction) => correction.depositId === item.id)) {
-    res.status(409).json({ error: "This approved deposit has already been reversed" });
-    return;
-  }
-
-  const linkedReward = referralRewards.find((reward) => reward.depositId === item.id);
-  const affectedUserIds = new Set([
-    item.userId,
-    ...(linkedReward ? [linkedReward.referrerUserId] : []),
-  ]);
-  const unsafeWithdrawals = withdrawals.filter(
-    (withdrawal) =>
-      affectedUserIds.has(withdrawal.userId) && withdrawal.status !== "rejected",
-  );
-  if (unsafeWithdrawals.length > 0) {
-    res.status(409).json({
-      error:
-        "This deposit cannot be reversed while the depositor or linked referrer has a pending, processing, or completed withdrawal",
-    });
-    return;
-  }
-
-  const correctedAt = now();
-  const correction: DepositCorrection = {
-    id: `COR-${item.id}`,
-    depositId: item.id,
-    userId: item.userId,
-    reason,
-    depositAmount: money(item.amount),
-    referralRewardAmount: linkedReward ? money(linkedReward.reward) : 0,
-    correctedAt,
-  };
-
-  depositCorrections.unshift(correction);
-  transactions.unshift({
-    id: `TX-${correction.id}-DEPOSIT`,
-    type: "adjustment",
-    amount: -correction.depositAmount,
-    status: "completed",
-    reference: correction.id,
-    createdAt: correctedAt,
-    userId: item.userId,
-  });
-  if (linkedReward) {
-    transactions.unshift({
-      id: `TX-${correction.id}-REFERRAL`,
-      type: "adjustment",
-      amount: -correction.referralRewardAmount,
-      status: "completed",
-      reference: correction.id,
-      createdAt: correctedAt,
-      userId: linkedReward.referrerUserId,
-    });
-  }
-  syncInvestmentToApprovedDeposit(ensureInvestment(item.userId));
-  addAuditLog(
-    "Approved deposit reversed",
-    correction.depositAmount,
-    `Deposit request #${item.id} corrected by Operations: ${correction.reason}. Referral correction: ${correction.referralRewardAmount.toFixed(2)} USDT`,
-  );
-  res.json(ReverseApprovedDepositResponse.parse(publicDeposit(item)));
+  await seedFinancialRecords();
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    // Derive the advisory-lock set from the authoritative tables, then take
+    // the same depositor lock used by approval *before* taking row locks.
+    // This ordering avoids an approval/reversal deadlock.
+    const initialDeposit = await client.query(
+      `select d.id,d.user_id,d.amount,d.status,a.referrer_user_id
+       from primevora_deposits d
+       left join primevora_referral_attributions a on a.referred_user_id=d.user_id
+       where d.id=$1`,
+      [params.data.id],
+    );
+    if (!initialDeposit.rowCount) {
+      await client.query("rollback");
+      res.status(404).json({ error: "Deposit request not found" });
+      return;
+    }
+    const lockUserIds = [
+      initialDeposit.rows[0].user_id as string,
+      ...(initialDeposit.rows[0].referrer_user_id
+        ? [initialDeposit.rows[0].referrer_user_id as string]
+        : []),
+    ].sort();
+    for (const affectedUserId of [...new Set(lockUserIds)]) {
+      await client.query("select pg_advisory_xact_lock(hashtext($1))", [affectedUserId]);
+    }
+    // Approval takes the depositor advisory lock before its deposit lock.
+    // Re-read every dependency after that lock to make the decision from a
+    // coherent, serialized ledger view.
+    const depositResult = await client.query(
+      `select d.id,d.user_id,d.amount,d.status,a.referrer_user_id
+       from primevora_deposits d
+       left join primevora_referral_attributions a on a.referred_user_id=d.user_id
+       where d.id=$1 for update of d`,
+      [params.data.id],
+    );
+    const correctionResult = await client.query(
+      `select id from primevora_deposit_corrections where deposit_id=$1 for update`,
+      [params.data.id],
+    );
+    const rewardResult = await client.query(
+      `select id,referrer_user_id,reward from primevora_referral_rewards where deposit_id=$1 for update`,
+      [params.data.id],
+    );
+    const row = depositResult.rows[0];
+    if (row.status !== "completed") {
+      await client.query("rollback");
+      res.status(409).json({ error: "Only an approved deposit can be reversed" });
+      return;
+    }
+    if (correctionResult.rowCount) {
+      await client.query("rollback");
+      res.status(409).json({ error: "This approved deposit has already been reversed" });
+      return;
+    }
+    const linkedReward = rewardResult.rows[0];
+    const affectedUserIds = [...new Set([row.user_id as string, ...(linkedReward ? [linkedReward.referrer_user_id as string] : [])])];
+    const unsafe = await client.query(`select 1 from primevora_withdrawals where user_id = any($1::text[]) and status <> 'rejected' limit 1`, [[...affectedUserIds]]);
+    if (unsafe.rowCount) {
+      await client.query("rollback");
+      res.status(409).json({ error: "This deposit cannot be reversed while the depositor or linked referrer has a pending, processing, or completed withdrawal" });
+      return;
+    }
+    const correctedAt = now();
+    const correction: DepositCorrection = {
+      id: `COR-${row.id}`,
+      depositId: dbNumber(row.id),
+      userId: row.user_id,
+      reason,
+      depositAmount: money(dbNumber(row.amount)),
+      referralRewardAmount: linkedReward ? money(dbNumber(linkedReward.reward)) : 0,
+      correctedAt,
+    };
+    await client.query(
+      `insert into primevora_deposit_corrections (id,deposit_id,user_id,reason,deposit_amount,referral_reward_amount,corrected_at)
+       values ($1,$2,$3,$4,$5,$6,$7)`,
+      [correction.id, correction.depositId, correction.userId, correction.reason, correction.depositAmount, correction.referralRewardAmount, correction.correctedAt],
+    );
+    await client.query(
+      `insert into primevora_transactions (id,user_id,type,amount,status,reference,created_at)
+       values ($1,$2,'adjustment',$3,'completed',$4,$5)`,
+      [`TX-${correction.id}-DEPOSIT`, correction.userId, -correction.depositAmount, correction.id, correctedAt],
+    );
+    if (linkedReward) await client.query(
+      `insert into primevora_transactions (id,user_id,type,amount,status,reference,created_at)
+       values ($1,$2,'adjustment',$3,'completed',$4,$5)`,
+      [`TX-${correction.id}-REFERRAL`, linkedReward.referrer_user_id, -correction.referralRewardAmount, correction.id, correctedAt],
+    );
+    await client.query("commit");
+    // Only update in-memory investment/audit presentation state after the
+    // durable ledger operation has committed.
+    const item: DepositRequest = { id: correction.depositId, userId: correction.userId, amount: correction.depositAmount, status: "completed", network: "TRC20", address: null, createdAt: correctedAt };
+    depositCorrections.unshift(correction);
+    syncInvestmentToApprovedDeposit(ensureInvestment(item.userId));
+    addAuditLog(
+      "Approved deposit reversed",
+      correction.depositAmount,
+      `Deposit request #${item.id} corrected by Operations: ${correction.reason}. Referral correction: ${correction.referralRewardAmount.toFixed(2)} USDT`,
+    );
+    res.json(ReverseApprovedDepositResponse.parse(publicDeposit(item)));
+  } catch (error) { await client.query("rollback"); throw error; } finally { client.release(); }
 });
 
-router.get("/admin/withdrawals", (_req, res) => {
+router.get("/admin/withdrawals", async (_req, res) => {
+  await refreshFinancialRecords();
   res.json(GetAdminWithdrawalsResponse.parse(withdrawals.map(publicWithdrawal)));
 });
 
-router.post("/admin/withdrawals/:id/status", (req, res) => {
+router.post("/admin/withdrawals/:id/status", async (req, res) => {
   const params = UpdateWithdrawalStatusParams.safeParse(req.params);
   const parsed = UpdateWithdrawalStatusBody.safeParse(req.body);
   if (!params.success || !parsed.success) {
     res.status(400).json({ error: "Invalid withdrawal status update" });
     return;
   }
+  await refreshFinancialRecords();
   const item = withdrawals.find((candidate) => candidate.id === params.data.id);
   if (!item) {
     res.status(404).json({ error: "Withdrawal request not found" });
@@ -1308,16 +1517,48 @@ router.post("/admin/withdrawals/:id/status", (req, res) => {
     res.status(409).json({ error: "Invalid withdrawal status transition" });
     return;
   }
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    const locked = await client.query(
+      `select user_id, status from primevora_withdrawals where id=$1 for update`,
+      [item.id],
+    );
+    if (!locked.rowCount) {
+      await client.query("rollback");
+      res.status(404).json({ error: "Withdrawal request not found" });
+      return;
+    }
+    const persistedStatus = locked.rows[0].status as WithdrawalRequest["status"];
+    if (persistedStatus === "completed" || persistedStatus === "rejected") {
+      await client.query("rollback");
+      if (persistedStatus !== parsed.data.status) {
+        res.status(409).json({ error: `A ${persistedStatus} withdrawal cannot change status` });
+      } else {
+        item.status = persistedStatus;
+        res.json(UpdateWithdrawalStatusResponse.parse(publicWithdrawal(item)));
+      }
+      return;
+    }
+    if (
+      (persistedStatus === "pending_review" && !["processing", "completed", "rejected"].includes(parsed.data.status)) ||
+      (persistedStatus === "processing" && !["completed", "rejected"].includes(parsed.data.status))
+    ) {
+      await client.query("rollback");
+      res.status(409).json({ error: "Invalid withdrawal status transition" });
+      return;
+    }
+    // Link by withdrawal_id for newly-created records; the id fallback keeps
+    // the seeded legacy transaction synchronized as well.
+    await client.query(`update primevora_withdrawals set status=$1 where id=$2`, [parsed.data.status, item.id]);
+    await client.query(
+      `update primevora_transactions set status=$1
+       where withdrawal_id=$2 or id=$3`,
+      [parsed.data.status === "completed" ? "completed" : parsed.data.status === "rejected" ? "rejected" : "pending", item.id, `TX-${item.id}`],
+    );
+    await client.query("commit");
+  } catch (error) { await client.query("rollback"); throw error; } finally { client.release(); }
   item.status = parsed.data.status;
-  const transaction = transactions.find((candidate) => candidate.id === `TX-${item.id}`);
-  if (transaction) {
-    transaction.status =
-      parsed.data.status === "completed"
-        ? "completed"
-        : parsed.data.status === "rejected"
-          ? "rejected"
-          : "pending";
-  }
   addAuditLog(
     `Withdrawal ${parsed.data.status}`,
     item.amount,

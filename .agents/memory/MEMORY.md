@@ -1,3 +1,4 @@
 - [Primevora artifact verification](primevora-artifact-verification.md) — standalone Vite builds need the artifact-managed PORT and BASE_PATH values; workflows inject both automatically.
 - [Approved-deposit investment baselines](admin-reported-investment-baselines.md) — the latest admin-approved deposit sets the exact investment principal; rate edits preserve accrued value.
 - [Deposit correction safety](deposit-correction-safety.md) — approved-deposit reversals use compensations and are blocked by withdrawals affecting either credited party.
+- [Balance reservation locking](balance-reservation-locking.md) — balance-changing operations sharing a user must take the same transaction-scoped database lock.
