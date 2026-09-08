@@ -76,6 +76,14 @@ export const DepositRequestNetwork = {
   TRC20: 'TRC20',
 } as const;
 
+export interface DepositCorrection {
+  id: string;
+  reason: string;
+  depositAmount: number;
+  referralRewardAmount: number;
+  correctedAt: string;
+}
+
 export interface DepositRequest {
   id: number;
   amount: number;
@@ -84,6 +92,7 @@ export interface DepositRequest {
   /** @nullable */
   address: string | null;
   createdAt: string;
+  correction: DepositCorrection | null;
 }
 
 export interface DepositInput {
@@ -109,6 +118,14 @@ export const DepositStatusUpdateInputStatus = {
 
 export interface DepositStatusUpdateInput {
   status: DepositStatusUpdateInputStatus;
+}
+
+export interface DepositCorrectionInput {
+  /**
+     * @minLength 10
+     * @maxLength 500
+     */
+  reason: string;
 }
 
 export type WithdrawalRequestStatus = typeof WithdrawalRequestStatus[keyof typeof WithdrawalRequestStatus];
@@ -158,6 +175,13 @@ export interface StatusUpdateInput {
   status: StatusUpdateInputStatus;
 }
 
+export type ReferralSummaryHistoryItemCorrection = {
+  id: string;
+  reason: string;
+  amount: number;
+  correctedAt: string;
+} | null;
+
 export type ReferralSummaryHistoryItem = {
   id: string;
   email: string;
@@ -166,6 +190,7 @@ export type ReferralSummaryHistoryItem = {
   rewardRate: number;
   reward: number;
   approvedAt: string;
+  correction: ReferralSummaryHistoryItemCorrection;
 };
 
 export interface ReferralSummary {

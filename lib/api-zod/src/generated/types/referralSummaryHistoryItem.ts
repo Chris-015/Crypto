@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { ReferralSummaryHistoryItemCorrection } from './referralSummaryHistoryItemCorrection';
 
 export type ReferralSummaryHistoryItem = {
   id: string;
@@ -14,4 +15,5 @@ export type ReferralSummaryHistoryItem = {
   rewardRate: number;
   reward: number;
   approvedAt: Date;
+  correction: ReferralSummaryHistoryItemCorrection;
 };

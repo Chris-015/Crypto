@@ -374,6 +374,29 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DepositRequest"
+  /admin/deposits/{id}/reverse:
+    post:
+      operationId: reverseApprovedDeposit
+      tags: [admin]
+      summary: Reverse an approved deposit with compensating ledger records
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DepositCorrectionInput"
+      responses:
+        "200":
+          description: Corrected deposit request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DepositRequest"
   /admin/withdrawals:
     get:
       operationId: getAdminWithdrawals
@@ -591,7 +614,7 @@ components:
         createdAt: { type: string, format: date-time }
     DepositRequest:
       type: object
-      required: [id, amount, status, network, address, createdAt]
+      required: [id, amount, status, network, address, createdAt, correction]
       properties:
         id: { type: number }
         amount: { type: number }
@@ -599,6 +622,10 @@ components:
         network: { type: string, enum: [TRC20] }
         address: { type: ["string", "null"] }
         createdAt: { type: string, format: date-time }
+        correction:
+          anyOf:
+            - $ref: "#/components/schemas/DepositCorrection"
+            - type: "null"
     DepositInput:
       type: object
       required: [amount]
@@ -614,6 +641,20 @@ components:
       required: [status]
       properties:
         status: { type: string, enum: [completed, rejected] }
+    DepositCorrectionInput:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 10, maxLength: 500 }
+    DepositCorrection:
+      type: object
+      required: [id, reason, depositAmount, referralRewardAmount, correctedAt]
+      properties:
+        id: { type: string }
+        reason: { type: string }
+        depositAmount: { type: number }
+        referralRewardAmount: { type: number }
+        correctedAt: { type: string, format: date-time }
     WithdrawalRequest:
       type: object
       required: [id, amount, address, status, network, createdAt]
@@ -650,7 +691,7 @@ components:
           type: array
           items:
             type: object
-            required: [id, email, joinedAt, depositAmount, rewardRate, reward, approvedAt]
+            required: [id, email, joinedAt, depositAmount, rewardRate, reward, approvedAt, correction]
             properties:
               id: { type: string }
               email: { type: string }
@@ -659,6 +700,16 @@ components:
               rewardRate: { type: number }
               reward: { type: number }
               approvedAt: { type: string, format: date-time }
+              correction:
+                anyOf:
+                  - type: object
+                    required: [id, reason, amount, correctedAt]
+                    properties:
+                      id: { type: string }
+                      reason: { type: string }
+                      amount: { type: number }
+                      correctedAt: { type: string, format: date-time }
+                  - type: "null"
     ReferralClaimInput:
       type: object
       required: [code]

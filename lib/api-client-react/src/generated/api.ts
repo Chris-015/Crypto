@@ -27,6 +27,7 @@ import type {
   CopyTrading,
   Dashboard,
   DepositAddressInput,
+  DepositCorrectionInput,
   DepositInput,
   DepositRequest,
   DepositStatusUpdateInput,
@@ -1720,6 +1721,78 @@ export const useUpdateDepositStatus = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getUpdateDepositStatusMutationOptions(options));
+    }
+
+export const getReverseApprovedDepositUrl = (id: number,) => {
+
+
+
+
+  return `/api/admin/deposits/${id}/reverse`
+}
+
+/**
+ * @summary Reverse an approved deposit with compensating ledger records
+ */
+export const reverseApprovedDeposit = async (id: number,
+    depositCorrectionInput: DepositCorrectionInput, options?: Parameters<typeof customFetch>[1]): Promise<DepositRequest> => {
+
+  return customFetch<DepositRequest>(getReverseApprovedDepositUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(depositCorrectionInput)
+  }
+);}
+
+
+
+
+
+export const getReverseApprovedDepositMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reverseApprovedDeposit>>, TError,{id: number;data: BodyType<DepositCorrectionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reverseApprovedDeposit>>, TError,{id: number;data: BodyType<DepositCorrectionInput>}, TContext> => {
+
+const mutationKey = ['reverseApprovedDeposit'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reverseApprovedDeposit>>, {id: number;data: BodyType<DepositCorrectionInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  reverseApprovedDeposit(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReverseApprovedDepositMutationResult = NonNullable<Awaited<ReturnType<typeof reverseApprovedDeposit>>>
+    export type ReverseApprovedDepositMutationBody = BodyType<DepositCorrectionInput>
+    export type ReverseApprovedDepositMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Reverse an approved deposit with compensating ledger records
+ */
+export const useReverseApprovedDeposit = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reverseApprovedDeposit>>, TError,{id: number;data: BodyType<DepositCorrectionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reverseApprovedDeposit>>,
+        TError,
+        {id: number;data: BodyType<DepositCorrectionInput>},
+        TContext
+      > => {
+      return useMutation(getReverseApprovedDepositMutationOptions(options));
     }
 
 export const getGetAdminWithdrawalsUrl = () => {

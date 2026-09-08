@@ -53,6 +53,9 @@ import {
   UpdateWithdrawalStatusBody,
   UpdateWithdrawalStatusParams,
   UpdateWithdrawalStatusResponse,
+  ReverseApprovedDepositBody,
+  ReverseApprovedDepositParams,
+  ReverseApprovedDepositResponse,
 } from "@workspace/api-zod";
 
 type Transaction = {
@@ -165,6 +168,16 @@ type AuditLog = {
   reason: string;
   createdAt: Date;
   reference: string;
+};
+
+type DepositCorrection = {
+  id: string;
+  depositId: number;
+  userId: string;
+  reason: string;
+  depositAmount: number;
+  referralRewardAmount: number;
+  correctedAt: Date;
 };
 
 const now = () => new Date();
@@ -398,6 +411,7 @@ const auditLogs: AuditLog[] = [
     reference: "AUD-77794",
   },
 ];
+const depositCorrections: DepositCorrection[] = [];
 
 let nextDepositId = 24837;
 let nextWithdrawalId = 24761;
@@ -441,12 +455,29 @@ const userIdFor = (req: Request) => resolveUserId(req) ?? "demo-user";
 
 const publicDeposit = (item: DepositRequest) => {
   const { userId: _userId, ...result } = item;
-  return result;
+  const correction = depositCorrections.find((candidate) => candidate.depositId === item.id);
+  return {
+    ...result,
+    correction: correction
+      ? {
+          id: correction.id,
+          reason: correction.reason,
+          depositAmount: correction.depositAmount,
+          referralRewardAmount: correction.referralRewardAmount,
+          correctedAt: correction.correctedAt,
+        }
+      : null,
+  };
 };
 
 const latestApprovedDeposit = (userId: string) =>
   deposits
-    .filter((item) => item.userId === userId && item.status === "completed")
+    .filter(
+      (item) =>
+        item.userId === userId &&
+        item.status === "completed" &&
+        !depositCorrections.some((correction) => correction.depositId === item.id),
+    )
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
 
 const publicWithdrawal = (item: WithdrawalRequest) => {
@@ -471,13 +502,26 @@ const completedDepositsTotal = (userId: string) =>
   money(
     deposits
       .filter((item) => item.userId === userId && item.status === "completed")
-      .reduce((sum, item) => sum + item.amount, 0),
+      .reduce(
+        (sum, item) =>
+          sum +
+          item.amount -
+          (depositCorrections.find((correction) => correction.depositId === item.id)?.depositAmount ?? 0),
+        0,
+      ),
   );
 const referralRewardsTotal = (userId: string) =>
   money(
     referralRewards
       .filter((item) => item.referrerUserId === userId)
-      .reduce((sum, item) => sum + item.reward, 0),
+      .reduce(
+        (sum, item) =>
+          sum +
+          item.reward -
+          (depositCorrections.find((correction) => correction.depositId === item.depositId)
+            ?.referralRewardAmount ?? 0),
+        0,
+      ),
   );
 const reservedWithdrawalsTotal = (userId: string) =>
   money(
@@ -792,6 +836,17 @@ router.get("/referrals", (req, res) => {
           rewardRate: reward.rewardRate,
           reward: reward.reward,
           approvedAt: reward.approvedAt,
+          correction: (() => {
+            const correction = depositCorrections.find((item) => item.depositId === reward.depositId);
+            return correction
+              ? {
+                  id: correction.id,
+                  reason: correction.reason,
+                  amount: correction.referralRewardAmount,
+                  correctedAt: correction.correctedAt,
+                }
+              : null;
+          })(),
         };
       }),
     }),
@@ -1097,6 +1152,90 @@ router.post("/admin/deposits/:id/status", (req, res) => {
     `Deposit request #${item.id} marked ${parsed.data.status} by Operations`,
   );
   res.json(UpdateDepositStatusResponse.parse(publicDeposit(item)));
+});
+
+router.post("/admin/deposits/:id/reverse", (req, res) => {
+  const params = ReverseApprovedDepositParams.safeParse(req.params);
+  const parsed = ReverseApprovedDepositBody.safeParse(req.body);
+  if (!params.success || !parsed.success) {
+    res.status(400).json({ error: "A correction reason of at least 10 characters is required" });
+    return;
+  }
+  const reason = parsed.data.reason.trim();
+  if (reason.length < 10) {
+    res.status(400).json({ error: "A correction reason of at least 10 characters is required" });
+    return;
+  }
+  const item = deposits.find((candidate) => candidate.id === params.data.id);
+  if (!item) {
+    res.status(404).json({ error: "Deposit request not found" });
+    return;
+  }
+  if (item.status !== "completed") {
+    res.status(409).json({ error: "Only an approved deposit can be reversed" });
+    return;
+  }
+  if (depositCorrections.some((correction) => correction.depositId === item.id)) {
+    res.status(409).json({ error: "This approved deposit has already been reversed" });
+    return;
+  }
+
+  const linkedReward = referralRewards.find((reward) => reward.depositId === item.id);
+  const affectedUserIds = new Set([
+    item.userId,
+    ...(linkedReward ? [linkedReward.referrerUserId] : []),
+  ]);
+  const unsafeWithdrawals = withdrawals.filter(
+    (withdrawal) =>
+      affectedUserIds.has(withdrawal.userId) && withdrawal.status !== "rejected",
+  );
+  if (unsafeWithdrawals.length > 0) {
+    res.status(409).json({
+      error:
+        "This deposit cannot be reversed while the depositor or linked referrer has a pending, processing, or completed withdrawal",
+    });
+    return;
+  }
+
+  const correctedAt = now();
+  const correction: DepositCorrection = {
+    id: `COR-${item.id}`,
+    depositId: item.id,
+    userId: item.userId,
+    reason,
+    depositAmount: money(item.amount),
+    referralRewardAmount: linkedReward ? money(linkedReward.reward) : 0,
+    correctedAt,
+  };
+
+  depositCorrections.unshift(correction);
+  transactions.unshift({
+    id: `TX-${correction.id}-DEPOSIT`,
+    type: "adjustment",
+    amount: -correction.depositAmount,
+    status: "completed",
+    reference: correction.id,
+    createdAt: correctedAt,
+    userId: item.userId,
+  });
+  if (linkedReward) {
+    transactions.unshift({
+      id: `TX-${correction.id}-REFERRAL`,
+      type: "adjustment",
+      amount: -correction.referralRewardAmount,
+      status: "completed",
+      reference: correction.id,
+      createdAt: correctedAt,
+      userId: linkedReward.referrerUserId,
+    });
+  }
+  syncInvestmentToApprovedDeposit(ensureInvestment(item.userId));
+  addAuditLog(
+    "Approved deposit reversed",
+    correction.depositAmount,
+    `Deposit request #${item.id} corrected by Operations: ${correction.reason}. Referral correction: ${correction.referralRewardAmount.toFixed(2)} USDT`,
+  );
+  res.json(ReverseApprovedDepositResponse.parse(publicDeposit(item)));
 });
 
 router.get("/admin/withdrawals", (_req, res) => {

@@ -71,6 +71,11 @@ const updateDeposit = (id: number, status: "completed" | "rejected") =>
     body: { status },
   });
 
+const reverseDeposit = (id: number, reason = "Duplicate blockchain confirmation") =>
+  request<{ correction?: { reason: string }; error?: string }>(`/admin/deposits/${id}/reverse`, {
+    body: { reason },
+  });
+
 const referralSummary = () =>
   request<{ earned: number; history: Array<{ depositAmount: number; reward: number }> }>(
     "/referrals",
@@ -129,6 +134,73 @@ test("deposit terminal statuses are idempotent but cannot be reversed", async ()
   assert.equal((await updateDeposit(rejectedId, "rejected")).status, 200);
   assert.equal((await updateDeposit(rejectedId, "rejected")).status, 200);
   assert.equal((await updateDeposit(rejectedId, "completed")).status, 409);
+});
+
+test("approved deposit corrections compensate the deposit and referral reward without changing approval history", async () => {
+  const referrerUserId = "correction-referrer";
+  const referredUserId = "correction-depositor";
+  const referrer = await request<{ code: string; earned: number }>("/referrals", { userId: referrerUserId });
+  assert.equal(
+    (await request("/referrals/claim", { userId: referredUserId, body: { code: referrer.body.code } })).status,
+    200,
+  );
+  const depositId = await prepareDeposit(referredUserId, 600);
+  assert.equal((await updateDeposit(depositId, "completed")).status, 200);
+  assert.equal((await request<{ balance: number }>("/dashboard", { userId: referredUserId })).body.balance, 600);
+  assert.equal((await request<{ earned: number }>("/referrals", { userId: referrerUserId })).body.earned, 30);
+
+  const corrected = await reverseDeposit(depositId, "Confirmed transfer belongs to another customer");
+  assert.equal(corrected.status, 200);
+  assert.equal(corrected.body.correction?.reason, "Confirmed transfer belongs to another customer");
+  assert.equal((await request<{ balance: number }>("/dashboard", { userId: referredUserId })).body.balance, 0);
+  assert.equal((await request<{ earned: number }>("/referrals", { userId: referrerUserId })).body.earned, 0);
+  const correctedReferrals = await request<{
+    history: Array<{ correction: { amount: number; reason: string } | null }>;
+  }>("/referrals", { userId: referrerUserId });
+  assert.ok(
+    correctedReferrals.body.history.some(
+      (reward) => reward.correction?.amount === 30 && reward.correction.reason.includes("another customer"),
+    ),
+  );
+  assert.equal((await reverseDeposit(depositId)).status, 409);
+
+  const adminDeposits = await request<Array<{ id: number; status: string; correction: unknown }>>("/admin/deposits");
+  const original = adminDeposits.body.find((deposit) => deposit.id === depositId);
+  assert.equal(original?.status, "completed");
+  assert.ok(original?.correction);
+  const overview = await request<{ auditLogs: Array<{ action: string; reason: string }> }>("/admin/overview");
+  assert.ok(overview.body.auditLogs.some((log) => log.action === "Deposit approved" && log.reason.includes(`#${depositId}`)));
+  assert.ok(overview.body.auditLogs.some((log) => log.action === "Approved deposit reversed" && log.reason.includes(`#${depositId}`)));
+});
+
+test("approved deposit corrections reject whitespace-only reasons", async () => {
+  const depositId = await prepareDeposit("correction-reason-user", 500);
+  assert.equal((await updateDeposit(depositId, "completed")).status, 200);
+  assert.equal((await reverseDeposit(depositId, "          ")).status, 400);
+  const deposit = (
+    await request<Array<{ id: number; correction: unknown }>>("/admin/deposits")
+  ).body.find((item) => item.id === depositId);
+  assert.equal(deposit?.correction, null);
+});
+
+test("an existing withdrawal blocks an approved deposit correction without changing the balance", async () => {
+  const userId = "correction-blocked-by-withdrawal";
+  assert.equal(
+    (await request("/admin/kyc/701/status", { body: { status: "approved" } })).status,
+    200,
+  );
+  const depositId = await prepareDeposit(userId, 500);
+  assert.equal((await updateDeposit(depositId, "completed")).status, 200);
+  const withdrawal = await request("/withdrawals", {
+    userId,
+    body: { amount: 25, address: "TBlockedCorrectionAddress12345678" },
+  });
+  assert.equal(withdrawal.status, 201);
+  const balanceBefore = (await request<{ balance: number }>("/dashboard", { userId })).body.balance;
+  const correction = await reverseDeposit(depositId);
+  assert.equal(correction.status, 409);
+  assert.match(correction.body.error ?? "", /withdrawal/i);
+  assert.equal((await request<{ balance: number }>("/dashboard", { userId })).body.balance, balanceBefore);
 });
 
 test("withdrawals reserve funds, rejection releases them, completion keeps them debited, and overspending fails", async () => {

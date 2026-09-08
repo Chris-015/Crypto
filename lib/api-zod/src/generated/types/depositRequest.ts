@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { DepositCorrection } from './depositCorrection';
 import type { DepositRequestNetwork } from './depositRequestNetwork';
 import type { DepositRequestStatus } from './depositRequestStatus';
 
@@ -16,4 +17,5 @@ export interface DepositRequest {
   /** @nullable */
   address: string | null;
   createdAt: Date;
+  correction: DepositCorrection | null;
 }

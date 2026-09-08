@@ -100,7 +100,14 @@ export const GetDepositsResponseItem = zod.object({
   "status": zod.enum(['awaiting_address', 'awaiting_transfer', 'pending_review', 'completed', 'rejected']),
   "network": zod.enum(['TRC20']),
   "address": zod.string().nullable(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "correction": zod.union([zod.object({
+  "id": zod.string(),
+  "reason": zod.string(),
+  "depositAmount": zod.number(),
+  "referralRewardAmount": zod.number(),
+  "correctedAt": zod.coerce.date()
+}),zod.null()])
 })
 export const GetDepositsResponse = zod.array(GetDepositsResponseItem)
 
@@ -123,7 +130,14 @@ export const CreateDepositResponse = zod.object({
   "status": zod.enum(['awaiting_address', 'awaiting_transfer', 'pending_review', 'completed', 'rejected']),
   "network": zod.enum(['TRC20']),
   "address": zod.string().nullable(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "correction": zod.union([zod.object({
+  "id": zod.string(),
+  "reason": zod.string(),
+  "depositAmount": zod.number(),
+  "referralRewardAmount": zod.number(),
+  "correctedAt": zod.coerce.date()
+}),zod.null()])
 })
 
 
@@ -182,7 +196,13 @@ export const GetReferralsResponse = zod.object({
   "depositAmount": zod.number(),
   "rewardRate": zod.number(),
   "reward": zod.number(),
-  "approvedAt": zod.coerce.date()
+  "approvedAt": zod.coerce.date(),
+  "correction": zod.union([zod.object({
+  "id": zod.string(),
+  "reason": zod.string(),
+  "amount": zod.number(),
+  "correctedAt": zod.coerce.date()
+}),zod.null()])
 }))
 })
 
@@ -327,7 +347,14 @@ export const GetAdminDepositsResponseItem = zod.object({
   "status": zod.enum(['awaiting_address', 'awaiting_transfer', 'pending_review', 'completed', 'rejected']),
   "network": zod.enum(['TRC20']),
   "address": zod.string().nullable(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "correction": zod.union([zod.object({
+  "id": zod.string(),
+  "reason": zod.string(),
+  "depositAmount": zod.number(),
+  "referralRewardAmount": zod.number(),
+  "correctedAt": zod.coerce.date()
+}),zod.null()])
 })
 export const GetAdminDepositsResponse = zod.array(GetAdminDepositsResponseItem)
 
@@ -449,7 +476,14 @@ export const AssignDepositAddressResponse = zod.object({
   "status": zod.enum(['awaiting_address', 'awaiting_transfer', 'pending_review', 'completed', 'rejected']),
   "network": zod.enum(['TRC20']),
   "address": zod.string().nullable(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "correction": zod.union([zod.object({
+  "id": zod.string(),
+  "reason": zod.string(),
+  "depositAmount": zod.number(),
+  "referralRewardAmount": zod.number(),
+  "correctedAt": zod.coerce.date()
+}),zod.null()])
 })
 
 
@@ -470,7 +504,47 @@ export const UpdateDepositStatusResponse = zod.object({
   "status": zod.enum(['awaiting_address', 'awaiting_transfer', 'pending_review', 'completed', 'rejected']),
   "network": zod.enum(['TRC20']),
   "address": zod.string().nullable(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "correction": zod.union([zod.object({
+  "id": zod.string(),
+  "reason": zod.string(),
+  "depositAmount": zod.number(),
+  "referralRewardAmount": zod.number(),
+  "correctedAt": zod.coerce.date()
+}),zod.null()])
+})
+
+
+/**
+ * @summary Reverse an approved deposit with compensating ledger records
+ */
+export const ReverseApprovedDepositParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const reverseApprovedDepositBodyReasonMin = 10;
+export const reverseApprovedDepositBodyReasonMax = 500;
+
+
+
+export const ReverseApprovedDepositBody = zod.object({
+  "reason": zod.string().min(reverseApprovedDepositBodyReasonMin).max(reverseApprovedDepositBodyReasonMax)
+})
+
+export const ReverseApprovedDepositResponse = zod.object({
+  "id": zod.number(),
+  "amount": zod.number(),
+  "status": zod.enum(['awaiting_address', 'awaiting_transfer', 'pending_review', 'completed', 'rejected']),
+  "network": zod.enum(['TRC20']),
+  "address": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "correction": zod.union([zod.object({
+  "id": zod.string(),
+  "reason": zod.string(),
+  "depositAmount": zod.number(),
+  "referralRewardAmount": zod.number(),
+  "correctedAt": zod.coerce.date()
+}),zod.null()])
 })
 
 
