@@ -426,10 +426,18 @@ const faqs = [
   },
 ];
 
-const userIdFor = (req: Request) => {
-  const auth = getAuth(req);
-  return auth.userId ?? "demo-user";
+type UserIdResolver = (req: Request) => string | null | undefined;
+
+let resolveUserId: UserIdResolver = (req) => getAuth(req).userId;
+
+export const setPrimevoraUserIdResolverForTests = (resolver: UserIdResolver) => {
+  if (process.env.NODE_ENV !== "test") {
+    throw new Error("The Primevora user ID resolver can only be replaced in tests");
+  }
+  resolveUserId = resolver;
 };
+
+const userIdFor = (req: Request) => resolveUserId(req) ?? "demo-user";
 
 const publicDeposit = (item: DepositRequest) => {
   const { userId: _userId, ...result } = item;
