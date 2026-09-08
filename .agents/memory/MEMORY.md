@@ -1,2 +1,2 @@
 - [Primevora artifact verification](primevora-artifact-verification.md) — standalone Vite builds need the artifact-managed PORT and BASE_PATH values; workflows inject both automatically.
-- [Admin-reported investment baselines](admin-reported-investment-baselines.md) — principal changes reset the reported baseline; rate-only edits preserve accrued value.
+- [Approved-deposit investment baselines](admin-reported-investment-baselines.md) — the latest admin-approved deposit sets the exact investment principal; rate edits preserve accrued value.

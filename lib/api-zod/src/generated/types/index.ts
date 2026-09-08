@@ -22,6 +22,8 @@ export * from './depositInput';
 export * from './depositRequest';
 export * from './depositRequestNetwork';
 export * from './depositRequestStatus';
+export * from './depositStatusUpdateInput';
+export * from './depositStatusUpdateInputStatus';
 export * from './faq';
 export * from './healthStatus';
 export * from './investmentEarning';

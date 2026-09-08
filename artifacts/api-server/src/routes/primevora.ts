@@ -4,6 +4,9 @@ import {
   AssignDepositAddressBody,
   AssignDepositAddressParams,
   AssignDepositAddressResponse,
+  UpdateDepositStatusBody,
+  UpdateDepositStatusParams,
+  UpdateDepositStatusResponse,
   CreateDepositBody,
   CreateDepositResponse,
   CreateTicketBody,
@@ -334,6 +337,11 @@ const publicDeposit = (item: DepositRequest) => {
   return result;
 };
 
+const latestApprovedDeposit = (userId: string) =>
+  deposits
+    .filter((item) => item.userId === userId && item.status === "completed")
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+
 const publicWithdrawal = (item: WithdrawalRequest) => {
   const { userId: _userId, ...result } = item;
   return result;
@@ -370,6 +378,19 @@ const ensureInvestment = (userId: string) => {
   return blank;
 };
 
+const syncInvestmentToApprovedDeposit = (record: InvestmentRecord) => {
+  const approvedDeposit = latestApprovedDeposit(record.userId);
+  const approvedAmount = approvedDeposit ? money(approvedDeposit.amount) : 0;
+  if (record.investmentAmount === approvedAmount) return;
+
+  record.investmentAmount = approvedAmount;
+  record.investmentStartDate = approvedDeposit ? approvedDeposit.createdAt : null;
+  record.lastAccruedDate = approvedDeposit ? dateKey(approvedDeposit.createdAt) : null;
+  record.currentPortfolioValue = approvedAmount;
+  record.totalAccumulatedProfit = 0;
+  record.earningsHistory = [];
+};
+
 const accrueInvestment = (record: InvestmentRecord) => {
   if (!record.investmentStartDate || record.investmentAmount <= 0) return;
   const today = dateKey(now());
@@ -393,6 +414,10 @@ const accrueInvestment = (record: InvestmentRecord) => {
 };
 
 const publicInvestment = (record: InvestmentRecord) => ({
+  approvedDepositAmount: latestApprovedDeposit(record.userId)
+    ? money(latestApprovedDeposit(record.userId)!.amount)
+    : 0,
+  depositApproved: Boolean(latestApprovedDeposit(record.userId)),
   investmentAmount: record.investmentAmount,
   dailyReturnPercentage: record.dailyReturnPercentage,
   dailyProfit: money(
@@ -485,6 +510,7 @@ router.get("/dashboard", (_req, res) => {
 
 router.get("/investment", (req, res) => {
   const record = ensureInvestment(userIdFor(req));
+  syncInvestmentToApprovedDeposit(record);
   accrueInvestment(record);
   res.json(GetInvestmentResponse.parse(publicInvestment(record)));
 });
@@ -721,7 +747,10 @@ router.get("/admin/deposits", (_req, res) => {
 });
 
 router.get("/admin/investments", (_req, res) => {
-  investmentRecords.forEach(accrueInvestment);
+  investmentRecords.forEach((record) => {
+    syncInvestmentToApprovedDeposit(record);
+    accrueInvestment(record);
+  });
   res.json(GetAdminInvestmentsResponse.parse(investmentRecords.map(adminInvestment)));
 });
 
@@ -755,33 +784,23 @@ router.put("/admin/investments/:userId", (req, res) => {
     res.status(400).json({ error: "Invalid investment figures" });
     return;
   }
+  const approvedDeposit = latestApprovedDeposit(params.data.userId);
+  if (!approvedDeposit) {
+    res.status(409).json({ error: "An approved deposit is required before setting the investment rate" });
+    return;
+  }
   const record = ensureInvestment(params.data.userId);
+  syncInvestmentToApprovedDeposit(record);
   const previousAmount = record.investmentAmount;
   if (previousAmount > 0) {
     accrueInvestment(record);
   }
-  const nextAmount = money(parsed.data.investmentAmount);
-  const amountChanged = previousAmount !== nextAmount;
-  record.investmentAmount = nextAmount;
   record.dailyReturnPercentage = parsed.data.dailyReturnPercentage;
   record.compoundingEnabled = true;
-  if (record.investmentAmount <= 0) {
-    record.investmentStartDate = null;
-    record.lastAccruedDate = null;
-    record.currentPortfolioValue = 0;
-    record.totalAccumulatedProfit = 0;
-    record.earningsHistory = [];
-  } else if (amountChanged) {
-    record.investmentStartDate = now();
-    record.lastAccruedDate = dateKey(record.investmentStartDate);
-    record.currentPortfolioValue = record.investmentAmount;
-    record.totalAccumulatedProfit = 0;
-    record.earningsHistory = [];
-  }
   addAuditLog(
-    "Admin-reported investment figures updated",
+    "Investment rate updated",
     record.investmentAmount,
-    `${record.userId}: ${record.investmentAmount} USDT at ${record.dailyReturnPercentage}% daily compounding`,
+    `${record.userId}: approved deposit ${record.investmentAmount} USDT at ${record.dailyReturnPercentage}% daily compounding`,
   );
   res.json(AdminSetInvestmentFiguresResponse.parse(adminInvestment(record)));
 });
@@ -801,6 +820,34 @@ router.post("/admin/deposits/:id/address", (req, res) => {
   item.address = parsed.data.address;
   item.status = "awaiting_transfer";
   res.json(AssignDepositAddressResponse.parse(publicDeposit(item)));
+});
+
+router.post("/admin/deposits/:id/status", (req, res) => {
+  const params = UpdateDepositStatusParams.safeParse(req.params);
+  const parsed = UpdateDepositStatusBody.safeParse(req.body);
+  if (!params.success || !parsed.success) {
+    res.status(400).json({ error: "Invalid deposit status update" });
+    return;
+  }
+  const item = deposits.find((candidate) => candidate.id === params.data.id);
+  if (!item) {
+    res.status(404).json({ error: "Deposit request not found" });
+    return;
+  }
+  if (parsed.data.status === "completed" && !item.address) {
+    res.status(409).json({ error: "A receiving address must be assigned before approving the deposit" });
+    return;
+  }
+  item.status = parsed.data.status;
+  if (item.status === "completed") {
+    syncInvestmentToApprovedDeposit(ensureInvestment(item.userId));
+  }
+  addAuditLog(
+    parsed.data.status === "completed" ? "Deposit approved" : "Deposit rejected",
+    item.amount,
+    `Deposit request #${item.id} marked ${parsed.data.status} by Operations`,
+  );
+  res.json(UpdateDepositStatusResponse.parse(publicDeposit(item)));
 });
 
 router.get("/admin/withdrawals", (_req, res) => {

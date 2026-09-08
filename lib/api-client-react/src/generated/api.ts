@@ -29,6 +29,7 @@ import type {
   DepositAddressInput,
   DepositInput,
   DepositRequest,
+  DepositStatusUpdateInput,
   Faq,
   HealthStatus,
   InvestmentRecord,
@@ -1574,6 +1575,78 @@ export const useAssignDepositAddress = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getAssignDepositAddressMutationOptions(options));
+    }
+
+export const getUpdateDepositStatusUrl = (id: number,) => {
+
+
+
+
+  return `/api/admin/deposits/${id}/status`
+}
+
+/**
+ * @summary Approve or reject a deposit request
+ */
+export const updateDepositStatus = async (id: number,
+    depositStatusUpdateInput: DepositStatusUpdateInput, options?: Parameters<typeof customFetch>[1]): Promise<DepositRequest> => {
+
+  return customFetch<DepositRequest>(getUpdateDepositStatusUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(depositStatusUpdateInput)
+  }
+);}
+
+
+
+
+
+export const getUpdateDepositStatusMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateDepositStatus>>, TError,{id: number;data: BodyType<DepositStatusUpdateInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateDepositStatus>>, TError,{id: number;data: BodyType<DepositStatusUpdateInput>}, TContext> => {
+
+const mutationKey = ['updateDepositStatus'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateDepositStatus>>, {id: number;data: BodyType<DepositStatusUpdateInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateDepositStatus(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateDepositStatusMutationResult = NonNullable<Awaited<ReturnType<typeof updateDepositStatus>>>
+    export type UpdateDepositStatusMutationBody = BodyType<DepositStatusUpdateInput>
+    export type UpdateDepositStatusMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Approve or reject a deposit request
+ */
+export const useUpdateDepositStatus = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateDepositStatus>>, TError,{id: number;data: BodyType<DepositStatusUpdateInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateDepositStatus>>,
+        TError,
+        {id: number;data: BodyType<DepositStatusUpdateInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateDepositStatusMutationOptions(options));
     }
 
 export const getGetAdminWithdrawalsUrl = () => {

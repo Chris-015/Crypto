@@ -1,10 +1,10 @@
 ---
-name: Admin-reported investment baselines
-description: Rules for keeping admin-assigned investment figures consistent when principals change.
+name: Approved-deposit investment baselines
+description: Rules for linking investment principals to deposits approved by Operations.
 ---
 
-When Operations changes an existing investment principal, reset the reported portfolio baseline and earnings history to the new assigned amount; rate-only edits preserve accrued value.
+The latest deposit approved by Operations is the source of truth for the investment principal. A newly approved amount resets the portfolio baseline and earnings history; rate-only edits preserve accrued value.
 
-**Why:** Leaving the previous compounded value in place makes the displayed principal, daily profit, and portfolio value internally inconsistent.
+**Why:** The user expects the investment to show the exact amount they requested and Operations approved, rather than an independently editable principal.
 
-**How to apply:** Treat a principal change as a new reporting baseline, keep compounding enabled by default, and keep all reported earnings separate from withdrawable balances.
+**How to apply:** Approve the deposit first, sync its amount into the investment record, keep compounding enabled by default, and keep earnings separate from withdrawable balances.

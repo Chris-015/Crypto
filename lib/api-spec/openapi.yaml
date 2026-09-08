@@ -333,6 +333,29 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DepositRequest"
+  /admin/deposits/{id}/status:
+    post:
+      operationId: updateDepositStatus
+      tags: [admin]
+      summary: Approve or reject a deposit request
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DepositStatusUpdateInput"
+      responses:
+        "200":
+          description: Updated deposit request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DepositRequest"
   /admin/withdrawals:
     get:
       operationId: getAdminWithdrawals
@@ -568,6 +591,11 @@ components:
       required: [address]
       properties:
         address: { type: string, minLength: 20 }
+    DepositStatusUpdateInput:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [completed, rejected] }
     WithdrawalRequest:
       type: object
       required: [id, amount, address, status, network, createdAt]
@@ -683,9 +711,11 @@ components:
         portfolioValue: { type: number }
     InvestmentRecord:
       type: object
-      required: [investmentAmount, dailyReturnPercentage, dailyProfit, totalAccumulatedProfit, currentPortfolioValue, investmentStartDate, compoundingEnabled, reportingMode, isWithdrawable, earningsHistory]
+      required: [investmentAmount, approvedDepositAmount, depositApproved, dailyReturnPercentage, dailyProfit, totalAccumulatedProfit, currentPortfolioValue, investmentStartDate, compoundingEnabled, reportingMode, isWithdrawable, earningsHistory]
       properties:
         investmentAmount: { type: number }
+        approvedDepositAmount: { type: number }
+        depositApproved: { type: boolean }
         dailyReturnPercentage: { type: number }
         dailyProfit: { type: number }
         totalAccumulatedProfit: { type: number }
@@ -707,9 +737,8 @@ components:
             userId: { type: string }
     AdminSetInvestmentFiguresInput:
       type: object
-      required: [investmentAmount, dailyReturnPercentage]
+      required: [dailyReturnPercentage]
       properties:
-        investmentAmount: { type: number, minimum: 0 }
         dailyReturnPercentage: { type: number, minimum: 0, maximum: 100 }
     Faq:
       type: object

@@ -7,8 +7,6 @@
  */
 
 export interface AdminSetInvestmentFiguresInput {
-  /** @minimum 0 */
-  investmentAmount: number;
   /**
      * @minimum 0
      * @maximum 100

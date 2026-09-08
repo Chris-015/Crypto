@@ -58,6 +58,8 @@ export const GetDashboardResponse = zod.object({
  */
 export const GetInvestmentResponse = zod.object({
   "investmentAmount": zod.number(),
+  "approvedDepositAmount": zod.number(),
+  "depositApproved": zod.boolean(),
   "dailyReturnPercentage": zod.number(),
   "dailyProfit": zod.number(),
   "totalAccumulatedProfit": zod.number(),
@@ -314,6 +316,8 @@ export const GetAdminDepositsResponse = zod.array(GetAdminDepositsResponseItem)
  */
 export const GetAdminInvestmentsResponseItem = zod.object({
   "investmentAmount": zod.number(),
+  "approvedDepositAmount": zod.number(),
+  "depositApproved": zod.boolean(),
   "dailyReturnPercentage": zod.number(),
   "dailyProfit": zod.number(),
   "totalAccumulatedProfit": zod.number(),
@@ -343,6 +347,8 @@ export const AdminAccrueInvestmentParams = zod.object({
 
 export const AdminAccrueInvestmentResponse = zod.object({
   "investmentAmount": zod.number(),
+  "approvedDepositAmount": zod.number(),
+  "depositApproved": zod.boolean(),
   "dailyReturnPercentage": zod.number(),
   "dailyProfit": zod.number(),
   "totalAccumulatedProfit": zod.number(),
@@ -369,20 +375,19 @@ export const AdminSetInvestmentFiguresParams = zod.object({
   "userId": zod.coerce.string()
 })
 
-export const adminSetInvestmentFiguresBodyInvestmentAmountMin = 0;
-
 export const adminSetInvestmentFiguresBodyDailyReturnPercentageMin = 0;
 export const adminSetInvestmentFiguresBodyDailyReturnPercentageMax = 100;
 
 
 
 export const AdminSetInvestmentFiguresBody = zod.object({
-  "investmentAmount": zod.number().min(adminSetInvestmentFiguresBodyInvestmentAmountMin),
   "dailyReturnPercentage": zod.number().min(adminSetInvestmentFiguresBodyDailyReturnPercentageMin).max(adminSetInvestmentFiguresBodyDailyReturnPercentageMax)
 })
 
 export const AdminSetInvestmentFiguresResponse = zod.object({
   "investmentAmount": zod.number(),
+  "approvedDepositAmount": zod.number(),
+  "depositApproved": zod.boolean(),
   "dailyReturnPercentage": zod.number(),
   "dailyProfit": zod.number(),
   "totalAccumulatedProfit": zod.number(),
@@ -418,6 +423,27 @@ export const AssignDepositAddressBody = zod.object({
 })
 
 export const AssignDepositAddressResponse = zod.object({
+  "id": zod.number(),
+  "amount": zod.number(),
+  "status": zod.enum(['awaiting_address', 'awaiting_transfer', 'pending_review', 'completed', 'rejected']),
+  "network": zod.enum(['TRC20']),
+  "address": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Approve or reject a deposit request
+ */
+export const UpdateDepositStatusParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const UpdateDepositStatusBody = zod.object({
+  "status": zod.enum(['completed', 'rejected'])
+})
+
+export const UpdateDepositStatusResponse = zod.object({
   "id": zod.number(),
   "amount": zod.number(),
   "status": zod.enum(['awaiting_address', 'awaiting_transfer', 'pending_review', 'completed', 'rejected']),

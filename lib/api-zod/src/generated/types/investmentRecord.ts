@@ -10,6 +10,8 @@ import type { InvestmentRecordReportingMode } from './investmentRecordReportingM
 
 export interface InvestmentRecord {
   investmentAmount: number;
+  approvedDepositAmount: number;
+  depositApproved: boolean;
   dailyReturnPercentage: number;
   dailyProfit: number;
   totalAccumulatedProfit: number;

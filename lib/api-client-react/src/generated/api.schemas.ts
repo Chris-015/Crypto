@@ -99,6 +99,18 @@ export interface DepositAddressInput {
   address: string;
 }
 
+export type DepositStatusUpdateInputStatus = typeof DepositStatusUpdateInputStatus[keyof typeof DepositStatusUpdateInputStatus];
+
+
+export const DepositStatusUpdateInputStatus = {
+  completed: 'completed',
+  rejected: 'rejected',
+} as const;
+
+export interface DepositStatusUpdateInput {
+  status: DepositStatusUpdateInputStatus;
+}
+
 export type WithdrawalRequestStatus = typeof WithdrawalRequestStatus[keyof typeof WithdrawalRequestStatus];
 
 
@@ -293,6 +305,8 @@ export const InvestmentRecordReportingMode = {
 
 export interface InvestmentRecord {
   investmentAmount: number;
+  approvedDepositAmount: number;
+  depositApproved: boolean;
   dailyReturnPercentage: number;
   dailyProfit: number;
   totalAccumulatedProfit: number;
@@ -310,8 +324,6 @@ export type AdminInvestmentRecord = InvestmentRecord & {
 };
 
 export interface AdminSetInvestmentFiguresInput {
-  /** @minimum 0 */
-  investmentAmount: number;
   /**
      * @minimum 0
      * @maximum 100
