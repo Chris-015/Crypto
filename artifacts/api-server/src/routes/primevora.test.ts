@@ -1,13 +1,20 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import express from "express";
-import primevoraRouter, { setPrimevoraUserIdResolverForTests } from "./primevora";
+import primevoraRouter, {
+  setPrimevoraAdminAuthResolverForTests,
+  setPrimevoraUserIdResolverForTests,
+} from "./primevora";
 
 const app = express();
 app.use(express.json());
 setPrimevoraUserIdResolverForTests(
   (req) => req.header("x-test-user-id") ?? "demo-user",
 );
+setPrimevoraAdminAuthResolverForTests((req) => ({
+  userId: req.header("x-test-user-id"),
+  role: req.header("x-test-role"),
+}));
 app.use("/api", primevoraRouter);
 
 let server: ReturnType<typeof app.listen>;
@@ -34,13 +41,26 @@ after(async () => {
 
 const request = async <T>(
   path: string,
-  options: { userId?: string; method?: string; body?: unknown } = {},
+  options: {
+    userId?: string | null;
+    role?: "admin" | "customer" | null;
+    method?: string;
+    body?: unknown;
+  } = {},
 ) => {
+  const isAdminRoute = path.startsWith("/admin");
+  const userId = options.userId === undefined
+    ? isAdminRoute
+      ? "test-admin"
+      : undefined
+    : options.userId;
+  const role = options.role === undefined && isAdminRoute ? "admin" : options.role;
   const response = await fetch(`${baseUrl}${path}`, {
     method: options.method ?? (options.body === undefined ? "GET" : "POST"),
     headers: {
       "content-type": "application/json",
-      ...(options.userId ? { "x-test-user-id": options.userId } : {}),
+      ...(userId ? { "x-test-user-id": userId } : {}),
+      ...(role ? { "x-test-role": role } : {}),
     },
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
   });
@@ -81,6 +101,54 @@ const referralSummary = () =>
     "/referrals",
     { userId: "demo-user" },
   );
+
+test("customers and unauthenticated callers cannot access admin routes", async () => {
+  const customerResponse = await request<{ error: string }>("/admin/deposits", {
+    userId: "customer-user",
+    role: "customer",
+  });
+  assert.equal(customerResponse.status, 403);
+  assert.equal(customerResponse.body.error, "Administrator access required");
+
+  const anonymousResponse = await request<{ error: string }>("/admin/deposits", {
+    userId: null,
+    role: null,
+  });
+  assert.equal(anonymousResponse.status, 401);
+  assert.equal(anonymousResponse.body.error, "Authentication required");
+});
+
+test("customers cannot approve deposits or release withdrawals", async () => {
+  const depositId = await prepareDeposit("authorization-deposit-user", 500);
+  const deniedDeposit = await request<{ error: string }>(
+    `/admin/deposits/${depositId}/status`,
+    {
+      userId: "customer-user",
+      role: "customer",
+      body: { status: "completed" },
+    },
+  );
+  assert.equal(deniedDeposit.status, 403);
+  const deposit = (
+    await request<Array<{ id: number; status: string }>>("/admin/deposits")
+  ).body.find((item) => item.id === depositId);
+  assert.equal(deposit?.status, "awaiting_transfer");
+
+  const withdrawalId = 24760;
+  const deniedWithdrawal = await request<{ error: string }>(
+    `/admin/withdrawals/${withdrawalId}/status`,
+    {
+      userId: "customer-user",
+      role: "customer",
+      body: { status: "completed" },
+    },
+  );
+  assert.equal(deniedWithdrawal.status, 403);
+  const storedWithdrawal = (
+    await request<Array<{ id: number; status: string }>>("/admin/withdrawals")
+  ).body.find((item) => item.id === withdrawalId);
+  assert.equal(storedWithdrawal?.status, "pending_review");
+});
 
 test("an approved referred deposit earns exactly one 5% reward when approval is replayed", async () => {
   const userId = "reward-once-user";

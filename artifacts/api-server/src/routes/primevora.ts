@@ -1,4 +1,4 @@
-import { Router, type IRouter, type Request } from "express";
+import { Router, type IRouter, type Request, type RequestHandler } from "express";
 import { getAuth } from "@clerk/express";
 import {
   AssignDepositAddressBody,
@@ -441,14 +441,37 @@ const faqs = [
 ];
 
 type UserIdResolver = (req: Request) => string | null | undefined;
+type AdminAuth = {
+  userId: string | null | undefined;
+  role: unknown;
+};
+type AdminAuthResolver = (req: Request) => AdminAuth;
 
 let resolveUserId: UserIdResolver = (req) => getAuth(req).userId;
+let resolveAdminAuth: AdminAuthResolver = (req) => {
+  const auth = getAuth(req);
+  const metadata = auth.sessionClaims?.metadata;
+  return {
+    userId: auth.userId,
+    role:
+      typeof metadata === "object" && metadata !== null && "role" in metadata
+        ? metadata.role
+        : undefined,
+  };
+};
 
 export const setPrimevoraUserIdResolverForTests = (resolver: UserIdResolver) => {
   if (process.env.NODE_ENV !== "test") {
     throw new Error("The Primevora user ID resolver can only be replaced in tests");
   }
   resolveUserId = resolver;
+};
+
+export const setPrimevoraAdminAuthResolverForTests = (resolver: AdminAuthResolver) => {
+  if (process.env.NODE_ENV !== "test") {
+    throw new Error("The Primevora admin auth resolver can only be replaced in tests");
+  }
+  resolveAdminAuth = resolver;
 };
 
 const userIdFor = (req: Request) => resolveUserId(req) ?? "demo-user";
@@ -662,6 +685,19 @@ const addAuditLog = (action: string, amount: number, reason: string) => {
 };
 
 const router: IRouter = Router();
+
+const requireAdmin: RequestHandler = (req, res, next) => {
+  const auth = resolveAdminAuth(req);
+  if (!auth.userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+  if (auth.role !== "admin") {
+    res.status(403).json({ error: "Administrator access required" });
+    return;
+  }
+  next();
+};
 
 router.get("/market", async (req, res): Promise<void> => {
   const ids = "bitcoin,ethereum,tether,binancecoin,solana,usd-coin,ripple,dogecoin,cardano,tron";
@@ -1008,6 +1044,8 @@ router.post("/support/tickets/:id/reply", (req, res) => {
   });
   res.status(201).json(CreateTicketReplyResponse.parse(publicTicket(ticket)));
 });
+
+router.use("/admin", requireAdmin);
 
 router.get("/admin/overview", (_req, res) => {
   res.json(
