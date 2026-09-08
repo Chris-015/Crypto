@@ -13,6 +13,7 @@ export interface ReferralSummary {
   totalReferred: number;
   activeReferred: number;
   earned: number;
+  withdrawableBalance: number;
   bonusRate: number;
   history: ReferralSummaryHistoryItem[];
 }

@@ -37,6 +37,8 @@ import type {
   KycStatusUpdateInput,
   KycSubmission,
   MarketAsset,
+  ReferralClaimInput,
+  ReferralClaimResult,
   ReferralSummary,
   StatusUpdateInput,
   SupportTicket,
@@ -833,6 +835,77 @@ export function useGetReferrals<TData = Awaited<ReturnType<typeof getReferrals>>
 
 
 
+
+export const getClaimReferralUrl = () => {
+
+
+
+
+  return `/api/referrals/claim`
+}
+
+/**
+ * @summary Link the current user to a referrer
+ */
+export const claimReferral = async (referralClaimInput: ReferralClaimInput, options?: Parameters<typeof customFetch>[1]): Promise<ReferralClaimResult> => {
+
+  return customFetch<ReferralClaimResult>(getClaimReferralUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(referralClaimInput)
+  }
+);}
+
+
+
+
+
+export const getClaimReferralMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof claimReferral>>, TError,{data: BodyType<ReferralClaimInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof claimReferral>>, TError,{data: BodyType<ReferralClaimInput>}, TContext> => {
+
+const mutationKey = ['claimReferral'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof claimReferral>>, {data: BodyType<ReferralClaimInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  claimReferral(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ClaimReferralMutationResult = NonNullable<Awaited<ReturnType<typeof claimReferral>>>
+    export type ClaimReferralMutationBody = BodyType<ReferralClaimInput>
+    export type ClaimReferralMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Link the current user to a referrer
+ */
+export const useClaimReferral = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof claimReferral>>, TError,{data: BodyType<ReferralClaimInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof claimReferral>>,
+        TError,
+        {data: BodyType<ReferralClaimInput>},
+        TContext
+      > => {
+      return useMutation(getClaimReferralMutationOptions(options));
+    }
 
 export const getGetFaqsUrl = () => {
 

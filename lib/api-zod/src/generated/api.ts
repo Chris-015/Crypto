@@ -173,13 +173,34 @@ export const GetReferralsResponse = zod.object({
   "totalReferred": zod.number(),
   "activeReferred": zod.number(),
   "earned": zod.number(),
+  "withdrawableBalance": zod.number(),
   "bonusRate": zod.number(),
   "history": zod.array(zod.object({
   "id": zod.string(),
   "email": zod.string(),
   "joinedAt": zod.coerce.date(),
-  "reward": zod.number()
+  "depositAmount": zod.number(),
+  "rewardRate": zod.number(),
+  "reward": zod.number(),
+  "approvedAt": zod.coerce.date()
 }))
+})
+
+
+/**
+ * @summary Link the current user to a referrer
+ */
+export const claimReferralBodyCodeMin = 4;
+export const claimReferralBodyCodeMax = 64;
+
+
+
+export const ClaimReferralBody = zod.object({
+  "code": zod.string().min(claimReferralBodyCodeMin).max(claimReferralBodyCodeMax)
+})
+
+export const ClaimReferralResponse = zod.object({
+  "claimed": zod.boolean()
 })
 
 

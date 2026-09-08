@@ -37,6 +37,8 @@ export * from './kycSubmission';
 export * from './kycSubmissionDocumentType';
 export * from './kycSubmissionStatus';
 export * from './marketAsset';
+export * from './referralClaimInput';
+export * from './referralClaimResult';
 export * from './referralSummary';
 export * from './referralSummaryHistoryItem';
 export * from './statusUpdateInput';

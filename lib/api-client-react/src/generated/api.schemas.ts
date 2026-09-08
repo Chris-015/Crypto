@@ -162,7 +162,10 @@ export type ReferralSummaryHistoryItem = {
   id: string;
   email: string;
   joinedAt: string;
+  depositAmount: number;
+  rewardRate: number;
   reward: number;
+  approvedAt: string;
 };
 
 export interface ReferralSummary {
@@ -171,8 +174,21 @@ export interface ReferralSummary {
   totalReferred: number;
   activeReferred: number;
   earned: number;
+  withdrawableBalance: number;
   bonusRate: number;
   history: ReferralSummaryHistoryItem[];
+}
+
+export interface ReferralClaimInput {
+  /**
+     * @minLength 4
+     * @maxLength 64
+     */
+  code: string;
+}
+
+export interface ReferralClaimResult {
+  claimed: boolean;
 }
 
 export type KycSubmissionDocumentType = typeof KycSubmissionDocumentType[keyof typeof KycSubmissionDocumentType];

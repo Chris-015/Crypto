@@ -4,6 +4,8 @@ import {
   AssignDepositAddressBody,
   AssignDepositAddressParams,
   AssignDepositAddressResponse,
+  ClaimReferralBody,
+  ClaimReferralResponse,
   UpdateDepositStatusBody,
   UpdateDepositStatusParams,
   UpdateDepositStatusResponse,
@@ -60,6 +62,7 @@ type Transaction = {
   status: "completed" | "pending" | "rejected";
   reference: string | null;
   createdAt: Date;
+  userId: string;
 };
 
 type DepositRequest = {
@@ -85,6 +88,24 @@ type WithdrawalRequest = {
   network: "TRC20";
   createdAt: Date;
   userId: string;
+};
+
+type ReferralAttribution = {
+  referrerUserId: string;
+  referredUserId: string;
+  email: string;
+  joinedAt: Date;
+};
+
+type ReferralReward = {
+  id: string;
+  referrerUserId: string;
+  referredUserId: string;
+  depositId: number;
+  depositAmount: number;
+  rewardRate: number;
+  reward: number;
+  approvedAt: Date;
 };
 
 type SupportTicket = {
@@ -156,14 +177,25 @@ const transactions: Transaction[] = [
     status: "completed",
     reference: "TRC20-DEMO-24810",
     createdAt: new Date("2026-08-27T09:20:00Z"),
+    userId: "demo-user",
   },
   {
-    id: "TX-24792",
+    id: "TX-REF-24792",
     type: "referral",
     amount: 32.5,
     status: "completed",
     reference: "REF-8841",
     createdAt: new Date("2026-08-25T15:10:00Z"),
+    userId: "demo-user",
+  },
+  {
+    id: "TX-REF-24791",
+    type: "referral",
+    amount: 25,
+    status: "completed",
+    reference: "REF-24791",
+    createdAt: new Date("2026-08-20T12:30:00Z"),
+    userId: "demo-user",
   },
   {
     id: "TX-24760",
@@ -172,10 +204,38 @@ const transactions: Transaction[] = [
     status: "pending",
     reference: null,
     createdAt: new Date("2026-08-23T11:45:00Z"),
+    userId: "demo-user",
   },
 ];
 
 const deposits: DepositRequest[] = [
+  {
+    id: 24792,
+    amount: 650,
+    status: "completed",
+    network: "TRC20",
+    address: "TReferralDemoDepositAddressPreviewOnlyOne",
+    createdAt: new Date("2026-08-25T15:10:00Z"),
+    userId: "referred-user-1",
+  },
+  {
+    id: 24791,
+    amount: 500,
+    status: "completed",
+    network: "TRC20",
+    address: "TReferralDemoDepositAddressPreviewOnlyTwo",
+    createdAt: new Date("2026-08-20T12:30:00Z"),
+    userId: "referred-user-2",
+  },
+  {
+    id: 24835,
+    amount: 1000,
+    status: "awaiting_transfer",
+    network: "TRC20",
+    address: "TReferralPendingDepositAddressPreviewOnly",
+    createdAt: new Date("2026-08-28T11:30:00Z"),
+    userId: "referred-user-1",
+  },
   {
     id: 24810,
     amount: 2500,
@@ -193,6 +253,44 @@ const deposits: DepositRequest[] = [
     address: null,
     createdAt: new Date("2026-08-28T12:05:00Z"),
     userId: "demo-user",
+  },
+];
+
+const referralAttributions: ReferralAttribution[] = [
+  {
+    referrerUserId: "demo-user",
+    referredUserId: "referred-user-1",
+    email: "a••••@example.com",
+    joinedAt: new Date("2026-08-21T11:00:00Z"),
+  },
+  {
+    referrerUserId: "demo-user",
+    referredUserId: "referred-user-2",
+    email: "m••••@example.com",
+    joinedAt: new Date("2026-08-16T14:20:00Z"),
+  },
+];
+
+const referralRewards: ReferralReward[] = [
+  {
+    id: "REF-24792",
+    referrerUserId: "demo-user",
+    referredUserId: "referred-user-1",
+    depositId: 24792,
+    depositAmount: 650,
+    rewardRate: 5,
+    reward: 32.5,
+    approvedAt: new Date("2026-08-25T15:10:00Z"),
+  },
+  {
+    id: "REF-24791",
+    referrerUserId: "demo-user",
+    referredUserId: "referred-user-2",
+    depositId: 24791,
+    depositAmount: 500,
+    rewardRate: 5,
+    reward: 25,
+    approvedAt: new Date("2026-08-20T12:30:00Z"),
   },
 ];
 
@@ -305,6 +403,7 @@ let nextDepositId = 24837;
 let nextWithdrawalId = 24761;
 let nextTicketId = 1043;
 let nextAuditId = 3;
+const referralCodes = new Map<string, string>([["PRIME-8841", "demo-user"]]);
 
 const faqs = [
   {
@@ -353,6 +452,64 @@ const publicTicket = (item: SupportTicket) => {
 };
 
 const money = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
+const referralCodeFor = (userId: string) => {
+  const existing = [...referralCodes.entries()].find(([, owner]) => owner === userId)?.[0];
+  if (existing) return existing;
+  const code = `PRIME-${Buffer.from(userId).toString("hex").slice(-8).toUpperCase().padStart(8, "0")}`;
+  referralCodes.set(code, userId);
+  return code;
+};
+const completedDepositsTotal = (userId: string) =>
+  money(
+    deposits
+      .filter((item) => item.userId === userId && item.status === "completed")
+      .reduce((sum, item) => sum + item.amount, 0),
+  );
+const referralRewardsTotal = (userId: string) =>
+  money(
+    referralRewards
+      .filter((item) => item.referrerUserId === userId)
+      .reduce((sum, item) => sum + item.reward, 0),
+  );
+const reservedWithdrawalsTotal = (userId: string) =>
+  money(
+    withdrawals
+      .filter((item) => item.userId === userId && item.status !== "rejected")
+      .reduce((sum, item) => sum + item.amount, 0),
+  );
+const withdrawableBalance = (userId: string) =>
+  money(Math.max(0, completedDepositsTotal(userId) + referralRewardsTotal(userId) - reservedWithdrawalsTotal(userId)));
+const awardReferralReward = (deposit: DepositRequest) => {
+  if (deposit.status !== "completed" || referralRewards.some((item) => item.depositId === deposit.id)) return null;
+  const attribution = referralAttributions.find((item) => item.referredUserId === deposit.userId);
+  if (!attribution || attribution.referrerUserId === deposit.userId) return null;
+  const reward: ReferralReward = {
+    id: `REF-${deposit.id}`,
+    referrerUserId: attribution.referrerUserId,
+    referredUserId: deposit.userId,
+    depositId: deposit.id,
+    depositAmount: money(deposit.amount),
+    rewardRate: 5,
+    reward: money(deposit.amount * 0.05),
+    approvedAt: now(),
+  };
+  referralRewards.unshift(reward);
+  transactions.unshift({
+    id: `TX-${reward.id}`,
+    type: "referral",
+    amount: reward.reward,
+    status: "completed",
+    reference: reward.id,
+    createdAt: reward.approvedAt,
+    userId: reward.referrerUserId,
+  });
+  addAuditLog(
+    "Referral reward issued",
+    reward.reward,
+    `5% reward for approved deposit #${deposit.id}`,
+  );
+  return reward;
+};
 const dateKey = (value: Date) => value.toISOString().slice(0, 10);
 const nextDateKey = (value: string) => {
   const date = new Date(`${value}T00:00:00.000Z`);
@@ -496,14 +653,24 @@ router.get("/market", async (req, res): Promise<void> => {
   }
 });
 
-router.get("/dashboard", (_req, res) => {
+router.get("/dashboard", (req, res) => {
+  const userId = userIdFor(req);
+  const userTransactions = transactions.filter((item) => item.userId === userId);
   const data = {
-    balance: 12840.75,
-    pendingBalance: 800,
-    totalDeposited: 18450,
-    totalWithdrawn: 1250,
-    referralRewards: 186.5,
-    recentActivity: transactions,
+    balance: withdrawableBalance(userId),
+    pendingBalance: money(
+      deposits
+        .filter((item) => item.userId === userId && !["completed", "rejected"].includes(item.status))
+        .reduce((sum, item) => sum + item.amount, 0),
+    ),
+    totalDeposited: completedDepositsTotal(userId),
+    totalWithdrawn: money(
+      withdrawals
+        .filter((item) => item.userId === userId && item.status === "completed")
+        .reduce((sum, item) => sum + item.amount, 0),
+    ),
+    referralRewards: referralRewardsTotal(userId),
+    recentActivity: userTransactions,
   };
   res.json(GetDashboardResponse.parse(data));
 });
@@ -515,13 +682,14 @@ router.get("/investment", (req, res) => {
   res.json(GetInvestmentResponse.parse(publicInvestment(record)));
 });
 
-router.get("/transactions", (_req, res) => {
-  res.json(GetTransactionsResponse.parse(transactions));
+router.get("/transactions", (req, res) => {
+  const userId = userIdFor(req);
+  res.json(GetTransactionsResponse.parse(transactions.filter((item) => item.userId === userId)));
 });
 
 router.get("/deposits", (req, res) => {
   const userId = userIdFor(req);
-  res.json(GetDepositsResponse.parse(deposits.filter((item) => item.userId === userId || userId === "demo-user").map(publicDeposit)));
+  res.json(GetDepositsResponse.parse(deposits.filter((item) => item.userId === userId).map(publicDeposit)));
 });
 
 router.post("/deposits", (req, res) => {
@@ -548,7 +716,7 @@ router.get("/withdrawals", (req, res) => {
   const userId = userIdFor(req);
   res.json(
     GetWithdrawalsResponse.parse(
-      withdrawals.filter((item) => item.userId === userId || userId === "demo-user").map(publicWithdrawal),
+      withdrawals.filter((item) => item.userId === userId).map(publicWithdrawal),
     ),
   );
 });
@@ -563,6 +731,11 @@ router.post("/withdrawals", (req, res) => {
   const verification = kycSubmissions.find((candidate) => candidate.userId === userId) ?? kycSubmissions[0];
   if (verification.status !== "approved") {
     res.status(403).json({ error: "Withdrawals require approved KYC verification" });
+    return;
+  }
+  const available = withdrawableBalance(userId);
+  if (parsed.data.amount > available) {
+    res.status(409).json({ error: `Withdrawal exceeds available balance of ${available.toFixed(2)} USDT` });
     return;
   }
   const item: WithdrawalRequest = {
@@ -582,35 +755,79 @@ router.post("/withdrawals", (req, res) => {
     status: "pending",
     reference: null,
     createdAt: item.createdAt,
+    userId,
   });
   res.status(201).json(CreateWithdrawalResponse.parse(publicWithdrawal(item)));
 });
 
-router.get("/referrals", (_req, res) => {
+router.get("/referrals", (req, res) => {
+  const userId = userIdFor(req);
+  const code = referralCodeFor(userId);
+  const attributions = referralAttributions.filter((item) => item.referrerUserId === userId);
+  const rewards = referralRewards.filter((item) => item.referrerUserId === userId);
   res.json(
     GetReferralsResponse.parse({
-      code: "PRIME-8841",
-      link: "https://primevora.app/join/PRIME-8841",
-      totalReferred: 12,
-      activeReferred: 8,
-      earned: 186.5,
+      code,
+      link: `${req.protocol}://${req.get("host")}/join/${code}`,
+      totalReferred: attributions.length,
+      activeReferred: new Set(rewards.map((item) => item.referredUserId)).size,
+      earned: referralRewardsTotal(userId),
+      withdrawableBalance: withdrawableBalance(userId),
       bonusRate: 5,
-      history: [
-        {
-          id: "ref-1",
-          email: "a••••@example.com",
-          joinedAt: new Date("2026-08-21T11:00:00Z"),
-          reward: 32.5,
-        },
-        {
-          id: "ref-2",
-          email: "m••••@example.com",
-          joinedAt: new Date("2026-08-16T14:20:00Z"),
-          reward: 25,
-        },
-      ],
+      history: rewards.map((reward) => {
+        const attribution = attributions.find((item) => item.referredUserId === reward.referredUserId)!;
+        return {
+          id: reward.id,
+          email: attribution.email,
+          joinedAt: attribution.joinedAt,
+          depositAmount: reward.depositAmount,
+          rewardRate: reward.rewardRate,
+          reward: reward.reward,
+          approvedAt: reward.approvedAt,
+        };
+      }),
     }),
   );
+});
+
+router.post("/referrals/claim", (req, res) => {
+  const parsed = ClaimReferralBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const referredUserId = userIdFor(req);
+  const referrerUserId = referralCodes.get(parsed.data.code.toUpperCase());
+  if (!referrerUserId) {
+    res.status(404).json({ error: "Referral code not found" });
+    return;
+  }
+  if (referrerUserId === referredUserId) {
+    res.status(409).json({ error: "Self-referrals are not eligible" });
+    return;
+  }
+  const existing = referralAttributions.find((item) => item.referredUserId === referredUserId);
+  if (existing && existing.referrerUserId !== referrerUserId) {
+    res.status(409).json({ error: "This account is already linked to a referrer" });
+    return;
+  }
+  if (
+    !existing &&
+    (deposits.some((item) => item.userId === referredUserId) ||
+      withdrawals.some((item) => item.userId === referredUserId))
+  ) {
+    res.status(409).json({ error: "Referral codes must be claimed before the first account transaction" });
+    return;
+  }
+  if (!existing) {
+    referralAttributions.push({
+      referrerUserId,
+      referredUserId,
+      email: "Primevora member",
+      joinedAt: now(),
+    });
+  }
+  res.json(ClaimReferralResponse.parse({ claimed: true }));
 });
 
 router.get("/kyc", (req, res) => {
@@ -817,6 +1034,10 @@ router.post("/admin/deposits/:id/address", (req, res) => {
     res.status(404).json({ error: "Deposit request not found" });
     return;
   }
+  if (item.status !== "awaiting_address") {
+    res.status(409).json({ error: `An ${item.status} deposit cannot receive a new address` });
+    return;
+  }
   item.address = parsed.data.address;
   item.status = "awaiting_transfer";
   res.json(AssignDepositAddressResponse.parse(publicDeposit(item)));
@@ -838,10 +1059,30 @@ router.post("/admin/deposits/:id/status", (req, res) => {
     res.status(409).json({ error: "A receiving address must be assigned before approving the deposit" });
     return;
   }
+  if (item.status === "completed" || item.status === "rejected") {
+    if (item.status !== parsed.data.status) {
+      res.status(409).json({ error: `A ${item.status} deposit cannot change status` });
+      return;
+    }
+    res.json(UpdateDepositStatusResponse.parse(publicDeposit(item)));
+    return;
+  }
   item.status = parsed.data.status;
   if (item.status === "completed") {
-    syncInvestmentToApprovedDeposit(ensureInvestment(item.userId));
+    if (!transactions.some((transaction) => transaction.id === `TX-${item.id}`)) {
+      transactions.unshift({
+        id: `TX-${item.id}`,
+        type: "deposit",
+        amount: item.amount,
+        status: "completed",
+        reference: `DEPOSIT-${item.id}`,
+        createdAt: now(),
+        userId: item.userId,
+      });
+    }
+    awardReferralReward(item);
   }
+  syncInvestmentToApprovedDeposit(ensureInvestment(item.userId));
   addAuditLog(
     parsed.data.status === "completed" ? "Deposit approved" : "Deposit rejected",
     item.amount,
@@ -866,7 +1107,37 @@ router.post("/admin/withdrawals/:id/status", (req, res) => {
     res.status(404).json({ error: "Withdrawal request not found" });
     return;
   }
+  if (item.status === "completed" || item.status === "rejected") {
+    if (item.status !== parsed.data.status) {
+      res.status(409).json({ error: `A ${item.status} withdrawal cannot change status` });
+      return;
+    }
+    res.json(UpdateWithdrawalStatusResponse.parse(publicWithdrawal(item)));
+    return;
+  }
+  if (item.status === "pending_review" && !["processing", "completed", "rejected"].includes(parsed.data.status)) {
+    res.status(409).json({ error: "Invalid withdrawal status transition" });
+    return;
+  }
+  if (item.status === "processing" && !["completed", "rejected"].includes(parsed.data.status)) {
+    res.status(409).json({ error: "Invalid withdrawal status transition" });
+    return;
+  }
   item.status = parsed.data.status;
+  const transaction = transactions.find((candidate) => candidate.id === `TX-${item.id}`);
+  if (transaction) {
+    transaction.status =
+      parsed.data.status === "completed"
+        ? "completed"
+        : parsed.data.status === "rejected"
+          ? "rejected"
+          : "pending";
+  }
+  addAuditLog(
+    `Withdrawal ${parsed.data.status}`,
+    item.amount,
+    `Withdrawal request #${item.id} marked ${parsed.data.status} by Operations`,
+  );
   res.json(UpdateWithdrawalStatusResponse.parse(publicWithdrawal(item)));
 });
 

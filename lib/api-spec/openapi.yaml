@@ -158,6 +158,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ReferralSummary"
+  /referrals/claim:
+    post:
+      operationId: claimReferral
+      tags: [portfolio]
+      summary: Link the current user to a referrer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReferralClaimInput"
+      responses:
+        "200":
+          description: Referral attribution result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReferralClaimResult"
   /support/faqs:
     get:
       operationId: getFaqs
@@ -619,24 +637,38 @@ components:
         status: { type: string, enum: [pending_review, processing, completed, rejected] }
     ReferralSummary:
       type: object
-      required: [code, link, totalReferred, activeReferred, earned, bonusRate, history]
+      required: [code, link, totalReferred, activeReferred, earned, withdrawableBalance, bonusRate, history]
       properties:
         code: { type: string }
         link: { type: string }
         totalReferred: { type: number }
         activeReferred: { type: number }
         earned: { type: number }
+        withdrawableBalance: { type: number }
         bonusRate: { type: number }
         history:
           type: array
           items:
             type: object
-            required: [id, email, joinedAt, reward]
+            required: [id, email, joinedAt, depositAmount, rewardRate, reward, approvedAt]
             properties:
               id: { type: string }
               email: { type: string }
               joinedAt: { type: string, format: date-time }
+              depositAmount: { type: number }
+              rewardRate: { type: number }
               reward: { type: number }
+              approvedAt: { type: string, format: date-time }
+    ReferralClaimInput:
+      type: object
+      required: [code]
+      properties:
+        code: { type: string, minLength: 4, maxLength: 64 }
+    ReferralClaimResult:
+      type: object
+      required: [claimed]
+      properties:
+        claimed: { type: boolean }
     KycSubmission:
       type: object
       required: [id, fullName, dateOfBirth, country, documentType, documentNumber, documentReference, status, submittedAt]

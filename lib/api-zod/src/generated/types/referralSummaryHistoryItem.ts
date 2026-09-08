@@ -10,5 +10,8 @@ export type ReferralSummaryHistoryItem = {
   id: string;
   email: string;
   joinedAt: Date;
+  depositAmount: number;
+  rewardRate: number;
   reward: number;
+  approvedAt: Date;
 };
