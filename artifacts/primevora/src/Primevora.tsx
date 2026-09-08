@@ -363,8 +363,7 @@ function AdminDeposits() {
   const update = useUpdateDepositStatus({ request });
   const reverse = useReverseApprovedDeposit({ request });
   const qc = useQueryClient();
-  const [id, setId] = useState<number | null>(null);
-  const [address, setAddress] = useState('');
+  const [addressDrafts, setAddressDrafts] = useState<Record<number, string>>({});
   const [reverseId, setReverseId] = useState<number | null>(null);
   const [reason, setReason] = useState('');
   const refresh = () => {
@@ -373,10 +372,103 @@ function AdminDeposits() {
       getGetTransactionsQueryKey(), getGetReferralsQueryKey()].forEach((queryKey) =>
       qc.invalidateQueries({ queryKey }));
   };
-  const submit = (d: any) => assign.mutate({ id: d.id, data: { address } }, { onSuccess: () => { setId(null); setAddress(''); refresh(); } });
+  const submit = (depositId: number) => {
+    const address = addressDrafts[depositId]?.trim() ?? '';
+    assign.mutate(
+      { id: depositId, data: { address } },
+      {
+        onSuccess: () => {
+          setAddressDrafts((current) => {
+            const next = { ...current };
+            delete next[depositId];
+            return next;
+          });
+          refresh();
+        },
+      },
+    );
+  };
   const changeStatus = (depositId: number, status: 'completed' | 'rejected') => update.mutate({ id: depositId, data: { status } }, { onSuccess: refresh });
   const submitReversal = (depositId: number) => reverse.mutate({ id: depositId, data: { reason: reason.trim() } }, { onSuccess: () => { setReverseId(null); setReason(''); refresh(); } });
-  return <AppShell admin><PageIntro eyebrow="Review queue" title="Deposit requests" description="Assign receiving addresses, approve verified deposits, and record controlled corrections." /><Card><QueryState loading={q.isLoading} error={q.isError} onRetry={() => q.refetch()}>{q.data?.length ? <div className="divide-y divide-[#edf1f5]">{q.data.map((d) => <div key={d.id} className="p-5"><div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center"><div><p className="font-mono text-sm font-bold"><Amount value={d.amount} /></p><p className="mt-1 text-xs text-[#8190a4]">Request #{d.id} · {new Date(d.createdAt).toLocaleString()}</p>{d.correction && <div className="mt-3 rounded-lg border border-[#f0cbc7] bg-[#fff6f5] p-3 text-xs text-[#8f463f]"><p className="font-extrabold">Reversed {new Date(d.correction.correctedAt).toLocaleString()}</p><p className="mt-1">{d.correction.reason}</p><p className="mt-1 font-mono">Deposit −{d.correction.depositAmount.toFixed(2)} · Referral −{d.correction.referralRewardAmount.toFixed(2)} USDT</p></div>}</div><div className="flex flex-wrap items-center gap-3"><Status value={d.status} />{!d.address && d.status !== 'completed' && d.status !== 'rejected' ? <Button size="sm" onClick={() => { setId(d.id); setAddress(''); }} data-testid={`button-assign-address-${d.id}`}>Assign address</Button> : d.address && d.status !== 'completed' && d.status !== 'rejected' ? <><Button variant="outline" size="sm" onClick={() => changeStatus(d.id, 'rejected')} disabled={update.isPending}>Reject</Button><Button size="sm" onClick={() => changeStatus(d.id, 'completed')} disabled={update.isPending} className="bg-[#19b889] text-[#10213a]" data-testid={`button-approve-deposit-${d.id}`}>Approve deposit <Check className="h-4 w-4" /></Button></> : d.status === 'completed' && !d.correction ? <><span className="text-xs font-bold text-[#148c68]">Approved by admin</span><Button variant="outline" size="sm" onClick={() => { setReverseId(d.id); setReason(''); }} className="border-[#f0cbc7] text-[#b54c43]" data-testid={`button-reverse-deposit-${d.id}`}>Reverse approval</Button></> : null}</div></div>{id === d.id && <div className="mt-4 flex flex-col gap-2 sm:flex-row"><Input autoFocus minLength={20} value={address} onChange={(e) => setAddress(e.target.value)} placeholder="TRC20 address" className="font-mono text-xs" data-testid="input-admin-address" /><Button disabled={address.length < 20 || assign.isPending} onClick={() => submit(d)} data-testid="button-save-address">{assign.isPending ? 'Saving…' : 'Save address'}</Button></div>}{reverseId === d.id && <div className="mt-4 rounded-xl border border-[#f0cbc7] bg-[#fffafa] p-4"><p className="text-sm font-extrabold text-[#8f463f]">Reverse this approved deposit?</p><p className="mt-1 text-xs leading-5 text-[#96635e]">This creates compensating ledger records. It never deletes or reopens the original approval. Any active or completed withdrawal will block the correction.</p><Textarea autoFocus minLength={10} maxLength={500} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Required correction reason (at least 10 characters)" className="mt-3" data-testid="textarea-reversal-reason" /><div className="mt-3 flex gap-2"><Button variant="outline" onClick={() => { setReverseId(null); setReason(''); }}>Cancel</Button><Button disabled={reason.trim().length < 10 || reverse.isPending} onClick={() => submitReversal(d.id)} className="bg-[#b54c43] text-white hover:bg-[#994039]" data-testid="button-confirm-reversal">{reverse.isPending ? 'Recording correction…' : 'Record reversal'}</Button></div>{reverse.isError && <p className="mt-3 text-xs font-semibold text-[#b54c43]">Correction blocked. Check for existing withdrawals or a prior reversal.</p>}</div>}</div>)}</div> : <Empty icon={ArrowDownLeft} title="Deposit queue is clear" text="New deposit requests will appear here." />}</QueryState></Card></AppShell>;
+  return <AppShell admin>
+    <PageIntro eyebrow="Review queue" title="Deposit requests" description="Assign a TRC20 address first. After the customer sends funds, approve the verified deposit." />
+    <div className="mb-5 grid gap-3 sm:grid-cols-3">
+      {[
+        ['1', 'Customer requests', 'The request appears in this queue.'],
+        ['2', 'Assign TRC20 address', 'Save the address the customer should use.'],
+        ['3', 'Verify and approve', 'Approve only after confirming payment.'],
+      ].map(([step, title, text]) => <Card className="p-4" key={step}>
+        <p className="text-[10px] font-extrabold uppercase tracking-wider text-[#19a77e]">Step {step}</p>
+        <p className="mt-2 text-sm font-extrabold">{title}</p>
+        <p className="mt-1 text-xs leading-5 text-[#8190a4]">{text}</p>
+      </Card>)}
+    </div>
+    <Card>
+      <QueryState loading={q.isLoading} error={q.isError} onRetry={() => q.refetch()}>
+        {q.data?.length ? <div className="divide-y divide-[#edf1f5]">
+          {q.data.map((d) => {
+            const addressDraft = addressDrafts[d.id] ?? '';
+            const awaitingAddress = !d.address && d.status !== 'completed' && d.status !== 'rejected';
+            const awaitingApproval = Boolean(d.address) && d.status !== 'completed' && d.status !== 'rejected';
+            return <div key={d.id} className="p-5">
+              <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+                <div>
+                  <p className="font-mono text-sm font-bold"><Amount value={d.amount} /></p>
+                  <p className="mt-1 text-xs text-[#8190a4]">Request #{d.id} · {new Date(d.createdAt).toLocaleString()}</p>
+                  {d.address && <div className="mt-3 rounded-lg border border-[#cde5db] bg-[#f2fbf7] p-3">
+                    <p className="text-[10px] font-extrabold uppercase tracking-wider text-[#718d82]">Customer deposit address</p>
+                    <p className="mt-2 break-all font-mono text-xs text-[#183c34]">{d.address}</p>
+                  </div>}
+                  {d.correction && <div className="mt-3 rounded-lg border border-[#f0cbc7] bg-[#fff6f5] p-3 text-xs text-[#8f463f]">
+                    <p className="font-extrabold">Reversed {new Date(d.correction.correctedAt).toLocaleString()}</p>
+                    <p className="mt-1">{d.correction.reason}</p>
+                    <p className="mt-1 font-mono">Deposit −{d.correction.depositAmount.toFixed(2)} · Referral −{d.correction.referralRewardAmount.toFixed(2)} USDT</p>
+                  </div>}
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <Status value={d.status} />
+                  {awaitingApproval && <>
+                    <Button variant="outline" size="sm" onClick={() => changeStatus(d.id, 'rejected')} disabled={update.isPending}>Reject</Button>
+                    <Button size="sm" onClick={() => changeStatus(d.id, 'completed')} disabled={update.isPending} className="bg-[#19b889] text-[#10213a]" data-testid={`button-approve-deposit-${d.id}`}>Approve deposit <Check className="h-4 w-4" /></Button>
+                  </>}
+                  {d.status === 'completed' && !d.correction && <>
+                    <span className="text-xs font-bold text-[#148c68]">Approved by admin</span>
+                    <Button variant="outline" size="sm" onClick={() => { setReverseId(d.id); setReason(''); }} className="border-[#f0cbc7] text-[#b54c43]" data-testid={`button-reverse-deposit-${d.id}`}>Reverse approval</Button>
+                  </>}
+                </div>
+              </div>
+              {awaitingAddress && <div className="mt-4 rounded-xl border border-[#dce6ec] bg-[#f8fafb] p-4">
+                <label className="text-xs font-extrabold text-[#52637e]">Assign TRC20 address for this customer</label>
+                <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                  <Input
+                    minLength={20}
+                    value={addressDraft}
+                    onChange={(e) => setAddressDrafts((current) => ({ ...current, [d.id]: e.target.value }))}
+                    placeholder="Paste the customer’s TRC20 deposit address"
+                    className="font-mono text-xs"
+                    data-testid={`input-admin-address-${d.id}`}
+                  />
+                  <Button disabled={addressDraft.trim().length < 20 || assign.isPending} onClick={() => submit(d.id)} data-testid={`button-save-address-${d.id}`}>
+                    {assign.isPending ? 'Saving…' : 'Save & show to customer'}
+                  </Button>
+                </div>
+              </div>}
+              {reverseId === d.id && <div className="mt-4 rounded-xl border border-[#f0cbc7] bg-[#fffafa] p-4">
+                <p className="text-sm font-extrabold text-[#8f463f]">Reverse this approved deposit?</p>
+                <p className="mt-1 text-xs leading-5 text-[#96635e]">This creates compensating ledger records. It never deletes or reopens the original approval. Any active or completed withdrawal will block the correction.</p>
+                <Textarea autoFocus minLength={10} maxLength={500} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Required correction reason (at least 10 characters)" className="mt-3" data-testid="textarea-reversal-reason" />
+                <div className="mt-3 flex gap-2">
+                  <Button variant="outline" onClick={() => { setReverseId(null); setReason(''); }}>Cancel</Button>
+                  <Button disabled={reason.trim().length < 10 || reverse.isPending} onClick={() => submitReversal(d.id)} className="bg-[#b54c43] text-white hover:bg-[#994039]" data-testid="button-confirm-reversal">{reverse.isPending ? 'Recording correction…' : 'Record reversal'}</Button>
+                </div>
+                {reverse.isError && <p className="mt-3 text-xs font-semibold text-[#b54c43]">Correction blocked. Check for existing withdrawals or a prior reversal.</p>}
+              </div>}
+            </div>;
+          })}
+        </div> : <Empty icon={ArrowDownLeft} title="Deposit queue is clear" text="A TRC20 address field will appear here as soon as a customer creates a request." />}
+      </QueryState>
+    </Card>
+  </AppShell>;
 }
 
 function AdminWithdrawals() { const q = useGetAdminWithdrawals({ request }); const update = useUpdateWithdrawalStatus({ request }); const qc = useQueryClient(); const action = (id: number, status: any) => update.mutate({ id, data: { status } }, { onSuccess: () => { qc.invalidateQueries({ queryKey: getGetAdminWithdrawalsQueryKey() }); qc.invalidateQueries({ queryKey: getGetWithdrawalsQueryKey() }); qc.invalidateQueries({ queryKey: getGetAdminOverviewQueryKey() }); } }); return <AppShell admin><PageIntro eyebrow="Review queue" title="Withdrawal requests" description="Check destination details and update the operational status." /><Card><QueryState loading={q.isLoading} error={q.isError} onRetry={() => q.refetch()}>{q.data?.length ? <div className="divide-y divide-[#edf1f5]">{q.data.map((w) => <div className="p-5" key={w.id}><div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center"><div><p className="font-mono text-sm font-bold"><Amount value={w.amount} prefix="−" /></p><p className="mt-1 break-all font-mono text-[11px] text-[#8190a4]">{w.address}</p><p className="mt-1 text-[10px] text-[#9aa7b7]">Request #{w.id} · {new Date(w.createdAt).toLocaleString()}</p></div><div className="flex items-center gap-3"><Status value={w.status} /><select value={w.status} onChange={(e) => action(w.id, e.target.value)} disabled={update.isPending} className="h-9 rounded-md border border-[#d6e0e8] bg-white px-2 text-xs font-bold" data-testid={`select-withdrawal-status-${w.id}`}><option value="pending_review">Pending review</option><option value="processing">Processing</option><option value="completed">Completed</option><option value="rejected">Rejected</option></select></div></div></div>)}</div> : <Empty icon={ArrowUpRight} title="Withdrawal queue is clear" text="New requests will appear here." />}</QueryState></Card></AppShell>; }
