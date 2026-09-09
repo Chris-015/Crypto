@@ -457,3 +457,53 @@ button, a, input, textarea, select { transition: color .2s ease, background-colo
 @keyframes pv-enter { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes pv-pulse { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
 .pv-live { animation: pv-pulse 2.4s ease-in-out infinite; }
+
+/* Primevora surfaces use a deliberate dark palette while preserving the existing
+   utility classes used throughout the product screens. */
+.dark body { background: #0b1220; }
+.dark [class~="bg-white"] { background-color: #132033 !important; }
+.dark [class~="bg-[#f5f8fb]"] { background-color: #0b1220 !important; }
+.dark [class~="bg-[#f9fbfc]"] { background-color: #101b2c !important; }
+.dark [class~="bg-[#f7fafb]"] { background-color: #17263a !important; }
+.dark [class~="bg-[#f6f9fb]"] { background-color: #17263a !important; }
+.dark [class~="bg-[#f3f8f7]"],
+.dark [class~="bg-[#f2fbf7]"] { background-color: #132d2b !important; }
+.dark [class~="bg-[#edf4f5]"] { background-color: #182737 !important; }
+.dark [class~="bg-[#e9eff4]"] { background-color: #203047 !important; }
+.dark [class~="bg-[#edf7f3]"] { background-color: #15312e !important; }
+.dark [class~="bg-[#fff8f7]"],
+.dark [class~="bg-[#fff6f5]"] { background-color: #321f25 !important; }
+.dark [class~="bg-[#fff0ee]"] { background-color: #3a2227 !important; }
+.dark [class~="bg-[#fff7df]"] { background-color: #3a321e !important; }
+.dark [class~="bg-[#eaf8f1]"],
+.dark [class~="bg-[#e7f8f0]"],
+.dark [class~="bg-[#e8f8f1]"] { background-color: #15312e !important; }
+
+.dark [class~="text-[#15233b]"],
+.dark [class~="text-[#17233b]"],
+.dark [class~="text-[#10213a]"] { color: #edf4fb !important; }
+.dark [class~="text-[#52637e]"] { color: #b7c6d8 !important; }
+.dark [class~="text-[#64738c]"],
+.dark [class~="text-[#718097]"],
+.dark [class~="text-[#76859b]"],
+.dark [class~="text-[#8190a4]"] { color: #9fb0c4 !important; }
+.dark [class~="text-[#8a98aa]"],
+.dark [class~="text-[#8b99aa]"],
+.dark [class~="text-[#92a0b1]"],
+.dark [class~="text-[#9aa7b7]"] { color: #8498ae !important; }
+.dark [class~="text-[#148c68]"] { color: #56d5a9 !important; }
+
+.dark [class~="border-[#d7e0ea]"],
+.dark [class~="border-[#d9e3eb]"],
+.dark [class~="border-[#dfe7ee]"],
+.dark [class~="border-[#e1e8ef]"],
+.dark [class~="border-[#e2e9ef]"],
+.dark [class~="border-[#e8eef3]"],
+.dark [class~="border-[#edf1f5]"] { border-color: #2a3b52 !important; }
+.dark [class~="border-[#dfe6ef]"] { border-color: #334860 !important; }
+.dark input,
+.dark textarea,
+.dark select { color: #edf4fb; background-color: #17263a; }
+.dark input::placeholder,
+.dark textarea::placeholder { color: #71849b; }
+.dark .pv-noise::after { opacity: .04; }
