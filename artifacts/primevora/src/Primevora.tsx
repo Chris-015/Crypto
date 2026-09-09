@@ -8,7 +8,7 @@ import {
   ArrowDownLeft, ArrowUpRight, BadgeCheck, BarChart3, Bell, Check, ChevronDown, ChevronRight,
   CircleHelp, Copy, ExternalLink, FileText, Headphones, History, LayoutDashboard,
   LifeBuoy, LogOut, Menu, MoreHorizontal, RefreshCw, Search, Send, Settings, ShieldCheck,
-  Users, Wallet, X
+  Users, Wallet, X, Moon, Sun
 } from 'lucide-react';
 import {
   getGetAdminDepositsQueryKey, getGetAdminOverviewQueryKey, getGetMarketQueryKey,
@@ -92,6 +92,33 @@ function Logo({ dark = false }: { dark?: boolean }) {
   </Link>;
 }
 
+function useTheme() {
+  const [dark, setDark] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    const stored = window.localStorage.getItem('primevora-theme');
+    return stored ? stored === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', dark);
+    window.localStorage.setItem('primevora-theme', dark ? 'dark' : 'light');
+  }, [dark]);
+  return [dark, () => setDark((current) => !current)] as const;
+}
+
+function ThemeToggle() {
+  const [dark, toggle] = useTheme();
+  return <button
+    onClick={toggle}
+    className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#d9e3eb] bg-white px-3 text-xs font-bold text-[#52637e] hover:border-[#19b889] hover:text-[#148c68] dark:border-white/10 dark:bg-white/5 dark:text-[#c3cedb]"
+    aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+    aria-pressed={dark}
+    data-testid="button-theme-toggle"
+  >
+    {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+    <span className="hidden sm:inline">{dark ? 'Light mode' : 'Dark mode'}</span>
+  </button>;
+}
+
 function Landing() {
   const { isSignedIn } = useAuth();
   const dashboard = useGetDashboard({ request });
@@ -106,6 +133,7 @@ function Landing() {
         <Link href="/market" data-testid="link-market-public">Market</Link>
       </nav>
       <div className="flex items-center gap-2">
+        <ThemeToggle />
         <Link href="/sign-in" className="hidden px-3 py-2 text-sm font-bold text-[#52637e] sm:block" data-testid="link-sign-in">Sign in</Link>
         <Link href="/sign-up" className="rounded-lg bg-[#15233b] px-4 py-2.5 text-sm font-bold text-white hover:-translate-y-0.5 hover:bg-[#233957]" data-testid="link-get-started">Get started <ChevronRight className="ml-1 inline h-4 w-4" /></Link>
       </div>
